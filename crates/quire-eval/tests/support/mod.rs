@@ -227,6 +227,10 @@ impl CheckedClosure for Toy {
         Ok(())
     }
 
+    fn admits_request(&self, callable: &NodeKey, arguments: &[Value], _environment: &()) -> bool {
+        Self::admitted(callable) && arguments.len() == Self::arity(callable)
+    }
+
     fn admit_expression(
         &self,
         _expression: &Expression,
@@ -545,5 +549,36 @@ impl Body for ChargingBody {
             })),
             Resume::Again => Err(fault("charging-body-resumed-without-input")),
         }
+    }
+}
+
+/// A host body that requests `callee` with `arguments` as given, however
+/// invalid, to exercise the scheduler's request validation.
+pub struct BadRequest {
+    pub callee: NodeKey,
+    pub arguments: Vec<Value>,
+}
+
+impl BodyFactory for BadRequest {
+    fn begin(&self) -> Box<dyn Body> {
+        Box::new(BadRequestBody {
+            callee: self.callee,
+            arguments: self.arguments.clone(),
+        })
+    }
+}
+
+struct BadRequestBody {
+    callee: NodeKey,
+    arguments: Vec<Value>,
+}
+
+impl Body for BadRequestBody {
+    fn resume(&mut self, _input: Resume, _meter: &mut Meter) -> Result<Transition, InternalFault> {
+        Ok(Transition::Call(ChildRequest {
+            callee: self.callee,
+            arguments: self.arguments.clone(),
+            site: site(),
+        }))
     }
 }

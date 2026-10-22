@@ -37,9 +37,7 @@ pub trait CheckedClosure {
 
     /// Validate an application of `callable` to `arguments`, before any
     /// charge: the callable is in the closure, the arguments are complete and
-    /// each is a value of its parameter type. The scheduler also calls this
-    /// for a body's nested request; any failure there is a broken body, and
-    /// the session reports it as an internal fault.
+    /// each is a value of its parameter type.
     ///
     /// # Errors
     ///
@@ -51,6 +49,21 @@ pub trait CheckedClosure {
         arguments: &[Value],
         environment: &Self::Environment,
     ) -> Result<(), CallFailure>;
+
+    /// Whether a body's nested request to apply `callable` to `arguments` is
+    /// valid: the callable is in the closure, the argument count is its
+    /// parameter count, and each argument is a member of its parameter type.
+    ///
+    /// This is not [`Self::admit_call`]: it runs no supplied-value run,
+    /// charges neither the meter nor a supplied-value budget, and observes
+    /// no cancellation. A `false` is a broken body, which the session
+    /// reports as an internal fault, never as caller input.
+    fn admits_request(
+        &self,
+        callable: &NodeKey,
+        arguments: &[Value],
+        environment: &Self::Environment,
+    ) -> bool;
 
     /// Validate an evaluation of `expression` with `parameters`, before any
     /// charge.

@@ -11,7 +11,7 @@ use quire_eval::{Admission, CallFailure, Evaluation, FamilyOutcome, Progress, Re
 use quire_exact::{Cancel, CancelCause, ChargePoint, LimitKind, Outcome, Undefined};
 use support::{
     add, boom, completed_int, count, count_site, host_a, host_b, int, int_signature, lossy, meter,
-    refuse, site, spent, ChargingRelay, Counts, Expression, Finish, Relay, Toy,
+    refuse, site, spent, BadRequest, ChargingRelay, Counts, Expression, Finish, Relay, Toy,
 };
 
 /// Step a session to its terminal result, counting the steps.
@@ -226,17 +226,25 @@ fn cancelling_after_a_request_is_saved_runs_no_further_charge_or_body() {
     let session = runnable(session.step());
     let session = runnable(session.step());
     cancel.cancel(CancelCause::Requested);
-    match session.step() {
-        Progress::Terminal(Err(CallFailure::Cancelled(CancelCause::Requested))) => {}
-        Progress::Terminal(_) | Progress::Runnable(_) => panic!("expected a cancelled terminal"),
-    }
+    let Progress::Terminal(Ok(denied)) = session.step() else {
+        panic!("expected the located incomplete result at the child's call charge");
+    };
+    // FR-262-AC-7: the denial is the result, at the request's call site.
+    let FamilyOutcome::Evaluated(Outcome::Incomplete(record)) = &denied.outcome else {
+        panic!("expected an incomplete outcome, got {:?}", denied.outcome);
+    };
+    assert_eq!(record.limit_kind, LimitKind::WorkUnits);
+    assert_eq!(record.charge_point, ChargePoint::FunctionCall);
+    assert_eq!(record.limit, record.consumed);
+    assert_eq!(denied.location, Some(site()));
+    assert_eq!(cancel.tripped(), Some(CancelCause::Requested));
     assert_eq!(spent(&m), 1, "only the entered call was charged");
     assert_eq!((a.resumed(), b.begun()), (1, 0));
 }
 
 /// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
 #[test]
-fn a_charge_denied_by_cancellation_is_a_call_failure_not_an_incomplete_result() {
+fn a_charge_denied_by_cancellation_is_an_incomplete_result_not_a_call_failure() {
     let cell: Arc<OnceLock<Cancel>> = Arc::new(OnceLock::new());
     let polls = Arc::new(AtomicUsize::new(0));
     let cancel = Cancel::observing({
@@ -257,11 +265,11 @@ fn a_charge_denied_by_cancellation_is_a_call_failure_not_an_incomplete_result() 
             .begin_call(count(), vec![int(10)], &(), &mut m)
             .expect("admitted call"),
     );
-    // The third `function.call` charge was the one cancellation denied.
-    assert!(matches!(
-        result,
-        Err(CallFailure::Cancelled(CancelCause::Deadline))
-    ));
+    // The third `function.call` charge was the one cancellation denied; it is
+    // a denied charge like any other, and the handle reports the cause.
+    let denied = result.expect("a denied charge is an evaluation");
+    assert!(incomplete_at_call(&denied));
+    assert_eq!(cancel.tripped(), Some(CancelCause::Deadline));
     assert_eq!(spent(&m), 2);
 }
 
@@ -429,10 +437,10 @@ fn a_charging_body_runs_each_transition_once_and_keeps_the_childs_losses() {
 }
 
 /// A cancellation a body's own kernel charge observes in the root body's last
-/// transition is `CallFailure::Cancelled`, as one the scheduler's charge sees
-/// is (FR-276-AC-3).
+/// transition ends the session with that charge's located incomplete result,
+/// as one the scheduler's `function.call` charge sees does (FR-262-AC-10).
 #[test]
-fn cancellation_observed_by_the_root_bodys_last_charge_is_a_call_failure() {
+fn cancellation_observed_by_the_root_bodys_last_charge_is_an_incomplete_result() {
     let cell: Arc<OnceLock<Cancel>> = Arc::new(OnceLock::new());
     let polls = Arc::new(AtomicUsize::new(0));
     let cancel = Cancel::observing({
@@ -457,16 +465,54 @@ fn cancellation_observed_by_the_root_bodys_last_charge_is_a_call_failure() {
             counts: Counts::default(),
         },
     );
-    let mut m = meter(1_000).with_cancel(cancel);
+    let mut m = meter(1_000).with_cancel(cancel.clone());
     let (result, _) = drive(
         registry
             .begin_call(host_a(), vec![int(0)], &(), &mut m)
             .expect("admitted call"),
     );
-    assert!(matches!(
-        result,
-        Err(CallFailure::Cancelled(CancelCause::Requested))
-    ));
+    let denied = result.expect("a denied charge is an evaluation");
+    let FamilyOutcome::Evaluated(Outcome::Incomplete(record)) = &denied.outcome else {
+        panic!("expected an incomplete outcome, got {:?}", denied.outcome);
+    };
+    assert_eq!(record.limit_kind, LimitKind::WorkUnits);
+    assert_eq!(
+        record.charge_point,
+        ChargePoint::IntegerArithmeticArithmetic
+    );
+    assert_eq!(record.limit, record.consumed);
+    assert_eq!(cancel.tripped(), Some(CancelCause::Requested));
+}
+
+/// A request naming an admitted callable with the wrong argument count is as
+/// broken as one naming an absent callable: an internal fault of stage
+/// `quire-eval`, with no charge for the child.
+#[test]
+fn a_body_requesting_a_callee_with_the_wrong_arity_is_an_internal_fault() {
+    let mut registry = Registry::new(Toy::default());
+    register(
+        &mut registry,
+        host_a(),
+        BadRequest {
+            callee: add(),
+            arguments: vec![int(1)],
+        },
+    );
+    let mut m = meter(1_000);
+    let result = registry
+        .begin_call(host_a(), vec![int(1)], &(), &mut m)
+        .expect("the caller's own input is admitted")
+        .run();
+    match result {
+        Err(CallFailure::Fault(fault)) => {
+            assert_eq!(
+                (fault.stage(), fault.invariant()),
+                ("quire-eval", "child-request-not-admitted")
+            );
+        }
+        other => panic!("expected an internal fault, got {other:?}"),
+    }
+    assert_eq!(spent(&m), 1, "only the root call was charged");
 }
 
 /// Interface-level analogue of FR-262-AC-5: in `add(count(2), count(3))` the
@@ -564,7 +610,10 @@ fn a_body_requesting_a_callee_that_is_not_admitted_is_an_internal_fault() {
         .run();
     match result {
         Err(CallFailure::Fault(fault)) => {
-            assert_eq!(fault.invariant(), "child-request-not-admitted");
+            assert_eq!(
+                (fault.stage(), fault.invariant()),
+                ("quire-eval", "child-request-not-admitted")
+            );
         }
         other => panic!("expected an internal fault, got {other:?}"),
     }

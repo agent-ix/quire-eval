@@ -4,13 +4,11 @@
 //! time.
 
 use alloc::boxed::Box;
-use alloc::string::ToString;
 use alloc::sync::Arc;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::mem;
 
-use quire_exact::{Cancel, Charge, ChargePoint, Incomplete, Meter, NodeKey, Outcome, Value};
+use quire_exact::{Charge, ChargePoint, Incomplete, Meter, NodeKey, Outcome, Value};
 use quire_semantic_value::catalog::InternalFault;
 use quire_semantic_value::location::Location;
 
@@ -61,9 +59,8 @@ pub enum Progress<'a, C: CheckedClosure> {
 ///
 /// A session retains its task stack, call frames, lexical bindings, source
 /// locations, losses and accounting across steps. It is bound for life to the
-/// closure and sealed registry it began from, and to its environment, meter
-/// and the cancellation handle that meter carries, if any. It cannot be copied or rebound, and
-/// [`Self::step`] consumes it, so a session cannot be resumed after a
+/// closure and sealed registry it began from, and to its environment and
+/// meter. It cannot be copied or rebound, and [`Self::step`] consumes it, so a session cannot be resumed after a
 /// terminal result.
 ///
 /// Dropping a session releases its suspended frames and executes no
@@ -73,8 +70,6 @@ pub struct Session<'a, C: CheckedClosure> {
     bindings: Arc<Bindings>,
     environment: &'a C::Environment,
     meter: &'a mut Meter,
-    /// The handle the meter carries, polled before every transition.
-    cancel: Option<Cancel>,
     /// What to enter at the next transition, when set.
     entry: Option<Entry<C>>,
     /// The task stack: the callee is on top, its suspended callers below.
@@ -89,13 +84,11 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
         environment: &'a C::Environment,
         meter: &'a mut Meter,
     ) -> Self {
-        let cancel = meter.cancel().cloned();
         Self {
             closure,
             bindings,
             environment,
             meter,
-            cancel,
             entry: Some(entry),
             frames: Vec::new(),
         }
@@ -103,8 +96,7 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
 
     /// Advance the application by one finite saved transition.
     ///
-    /// Before the transition the session polls its cancellation handle. A
-    /// transition commits its state before returning. Yielding, saving a
+    /// A transition commits its state before returning. Yielding, saving a
     /// continuation, pushing or popping a frame and delivering a child add
     /// no charge; the only charges are the call charge of an entered
     /// application and the kernel charges its body makes.
@@ -133,9 +125,6 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
     }
 
     fn transition(&mut self) -> Result<Option<Evaluation>, CallFailure> {
-        if let Some(cause) = self.cancel.as_ref().and_then(Cancel::cause) {
-            return Err(CallFailure::Cancelled(cause));
-        }
         if let Some(entry) = self.entry.take() {
             return self.enter(entry);
         }
@@ -161,14 +150,14 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
             Transition::Continue => {}
             Transition::Call(request) => {
                 // The request is saved; the next transition validates,
-                // charges and pushes the callee, after polling cancellation.
+                // charges and pushes the callee.
                 self.entry = Some(Entry::Request(request));
             }
             Transition::Done(evaluation) => {
                 self.frames.pop();
                 match self.frames.last_mut() {
                     Some(caller) => caller.input = Resume::Child(evaluation),
-                    None => return self.finish(evaluation),
+                    None => return Ok(Some(evaluation)),
                 }
             }
         }
@@ -190,12 +179,12 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
             }) => {
                 // The caller's own input was admitted at `Begin`, so a request
                 // that fails admission is a broken body, not an input refusal.
-                self.closure
-                    .admit_call(&callee, &arguments, self.environment)
-                    .map_err(|refused| {
-                        InternalFault::new("eval", "child-request-not-admitted")
-                            .with_named(vec![("cause", refused.to_string())])
-                    })?;
+                if !self
+                    .closure
+                    .admits_request(&callee, &arguments, self.environment)
+                {
+                    return Err(fault("child-request-not-admitted").into());
+                }
                 self.enter_call(callee, arguments, Some(site))
             }
             Entry::Expression {
@@ -224,7 +213,7 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
         site: Option<Location>,
     ) -> Result<Option<Evaluation>, CallFailure> {
         if let Err(denied) = self.meter.charge(Charge::new(ChargePoint::FunctionCall)) {
-            return self.finish(Self::incomplete(denied, site));
+            return Ok(Some(Self::incomplete(denied, site)));
         }
         let frame = match self.bindings.get(&callable) {
             Some(factory) => Frame {
@@ -244,7 +233,10 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
         Ok(None)
     }
 
-    /// The located incomplete result of a denied charge.
+    /// The located incomplete result of a denied charge. A charge the meter's
+    /// cancellation handle denied is a denied charge like any other
+    /// (FR-262): earlier spend is retained, the denied charge is unrecorded,
+    /// and the handle's `tripped()` reports the cause for the caller to read.
     fn incomplete(denied: Incomplete, site: Option<Location>) -> Evaluation {
         Evaluation {
             outcome: FamilyOutcome::Evaluated(Outcome::Incomplete(denied)),
@@ -252,22 +244,9 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
             losses: Vec::new(),
         }
     }
-
-    /// End the session with `evaluation`, except that a charge the meter's
-    /// cancellation handle denied makes the whole application a
-    /// [`CallFailure::Cancelled`], whichever transition observed it and
-    /// whether the denied charge was the scheduler's or a body's (FR-276).
-    /// Otherwise the evaluation stands, with earlier spend retained and the
-    /// denied charge unrecorded.
-    fn finish(&self, evaluation: Evaluation) -> Result<Option<Evaluation>, CallFailure> {
-        match self.cancel.as_ref().and_then(Cancel::tripped) {
-            Some(cause) => Err(CallFailure::Cancelled(cause)),
-            None => Ok(Some(evaluation)),
-        }
-    }
 }
 
 /// A broken scheduler invariant, never a caller-input refusal.
 fn fault(invariant: &'static str) -> InternalFault {
-    InternalFault::new("eval", invariant)
+    InternalFault::new("quire-eval", invariant)
 }

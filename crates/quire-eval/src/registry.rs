@@ -116,8 +116,8 @@ impl<C: CheckedClosure> Registry<C> {
     /// Admission runs first and charges nothing. On success the registry is
     /// sealed before any factory invocation or charge, and the returned
     /// session is bound to this closure, `environment` and `meter`. The
-    /// session observes the cancellation handle the meter carries, if any: a
-    /// meter without one is not cancellable.
+    /// cancellation handle the meter carries, if any, is the session's: a meter without one
+    /// cannot be cancelled.
     /// The call's `function.call` charge is the session's first transition.
     ///
     /// # Errors
