@@ -11,7 +11,8 @@ use quire_eval::{Admission, CallFailure, Evaluation, FamilyOutcome, Progress, Re
 use quire_exact::{Cancel, CancelCause, ChargePoint, LimitKind, Outcome, Undefined};
 use support::{
     add, boom, completed_int, count, count_site, host_a, host_b, int, int_signature, lossy, meter,
-    refuse, site, spent, BadRequest, ChargingRelay, Counts, Expression, Finish, Relay, Toy,
+    population, ranged, refuse, site, spent, storage, BadRequest, ChargingRelay, Counts,
+    Expression, Finish, Relay, Toy, Yielding,
 };
 
 /// Step a session to its terminal result, counting the steps.
@@ -75,7 +76,7 @@ fn incomplete_at_call(evaluation: &Evaluation) -> bool {
     )
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn a_hundred_thousand_deep_call_runs_on_a_small_stack_and_stops_at_its_fuel() {
     const DEPTH: u64 = 100_000;
@@ -126,7 +127,7 @@ fn a_hundred_thousand_deep_call_runs_on_a_small_stack_and_stops_at_its_fuel() {
     assert!(outcome.is_ok(), "the worker thread panicked");
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn stepping_a_mixed_chain_matches_the_synchronous_run_and_resumes_each_caller_once() {
     let n = 5;
@@ -167,7 +168,7 @@ fn stepping_a_mixed_chain_matches_the_synchronous_run_and_resumes_each_caller_on
     }
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn one_unit_below_the_chain_spend_stops_at_the_denied_call_and_runs_no_more_body() {
     let (a, b) = (Counts::default(), Counts::default());
@@ -211,7 +212,7 @@ fn one_unit_below_the_chain_spend_stops_at_the_denied_call_and_runs_no_more_body
     assert_eq!(completed_int(&ok), Some(6));
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn cancelling_after_a_request_is_saved_runs_no_further_charge_or_body() {
     let (a, b) = (Counts::default(), Counts::default());
@@ -242,7 +243,7 @@ fn cancelling_after_a_request_is_saved_runs_no_further_charge_or_body() {
     assert_eq!((a.resumed(), b.begun()), (1, 0));
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn a_charge_denied_by_cancellation_is_an_incomplete_result_not_a_call_failure() {
     let cell: Arc<OnceLock<Cancel>> = Arc::new(OnceLock::new());
@@ -273,7 +274,7 @@ fn a_charge_denied_by_cancellation_is_an_incomplete_result_not_a_call_failure() 
     assert_eq!(spent(&m), 2);
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn a_child_undefined_outcome_propagates_through_a_direct_return_caller() {
     let counts = Counts::default();
@@ -309,7 +310,7 @@ fn a_child_undefined_outcome_propagates_through_a_direct_return_caller() {
     assert_eq!(counts.resumed(), 2);
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn an_interpreted_frame_propagates_a_non_completed_child_without_a_value() {
     let mut registry = Registry::new(Toy::default());
@@ -338,7 +339,7 @@ fn an_interpreted_frame_propagates_a_non_completed_child_without_a_value() {
     );
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn dropping_a_suspended_session_executes_no_continuation() {
     let counts = Counts::default();
@@ -382,7 +383,7 @@ fn register(
     );
 }
 
-/// Interface-level analogue of FR-262-AC-8: a body charges its own kernel
+/// Toy-closure test: a body charges its own kernel
 /// work, saves a local, requests a child and continues with the child's value,
 /// keeping the child's loss record.
 #[test]
@@ -515,7 +516,7 @@ fn a_body_requesting_a_callee_with_the_wrong_arity_is_an_internal_fault() {
     assert_eq!(spent(&m), 1, "only the root call was charged");
 }
 
-/// Interface-level analogue of FR-262-AC-5: in `add(count(2), count(3))` the
+/// Toy-closure test: in `add(count(2), count(3))` the
 /// argument applications are entered left to right, each before `add`'s own
 /// call.
 #[test]
@@ -552,7 +553,7 @@ fn argument_applications_run_left_to_right_before_the_outer_call() {
     assert_eq!(spent(&m), u64::try_from(expected.len()).unwrap());
 }
 
-/// Interface-level analogue of FR-262-AC-7: a child refusal propagates through
+/// Toy-closure test: a child refusal propagates through
 /// a direct-return caller with its location, and a child's loss record
 /// survives the hand-off.
 #[test]
@@ -618,4 +619,131 @@ fn a_body_requesting_a_callee_that_is_not_admitted_is_an_internal_fault() {
         other => panic!("expected an internal fault, got {other:?}"),
     }
     assert_eq!(spent(&m), 1, "only the root call was charged");
+}
+
+fn run_bad_request(
+    callee: quire_exact::NodeKey,
+    arguments: &[quire_exact::Value],
+) -> (Result<Evaluation, CallFailure>, u64, usize) {
+    let counts = Counts::default();
+    let mut registry = Registry::new(Toy::default());
+    register(
+        &mut registry,
+        host_a(),
+        Relay {
+            target: callee,
+            finish: Finish::Direct,
+            counts: counts.clone(),
+        },
+    );
+    // The relay forwards the one argument it is begun with to `callee`.
+    let mut m = meter(1_000);
+    let result = registry
+        .begin_call(
+            host_a(),
+            vec![arguments.first().cloned().unwrap_or_else(|| int(0))],
+            &(),
+            &mut m,
+        )
+        .expect("the caller's own input is admitted")
+        .run();
+    (result, spent(&m), counts.resumed())
+}
+
+/// FR-262-AC-11 analogue: five invalid requests each end the session as an
+/// internal fault with no child charge, no child body and the requesting body
+/// not resumed; the sixth, valid, request is applied with one call charge.
+#[test]
+fn invalid_child_requests_fault_and_a_valid_one_is_applied() {
+    let invalid: [(&str, quire_exact::NodeKey, Vec<quire_exact::Value>); 4] = [
+        ("absent callee", support::absent(), vec![int(1)]),
+        ("argument out of range", ranged(), vec![int(10)]),
+        (
+            "population of the wrong maximum",
+            population(),
+            vec![int(4)],
+        ),
+        (
+            "population the environment does not resolve",
+            population(),
+            vec![int(99)],
+        ),
+    ];
+    for (what, callee, arguments) in invalid {
+        let (result, spend, resumed) = run_bad_request(callee, &arguments);
+        match result {
+            Err(CallFailure::Fault(fault)) => assert_eq!(
+                (fault.stage(), fault.invariant()),
+                ("quire-eval", "child-request-not-admitted"),
+                "{what}"
+            ),
+            other => panic!("{what}: expected an internal fault, got {other:?}"),
+        }
+        assert_eq!(spend, 1, "{what}: only the root call was charged");
+        assert_eq!(resumed, 1, "{what}: the requesting body is not resumed");
+    }
+    // Wrong argument count.
+    let mut registry = Registry::new(Toy::default());
+    register(
+        &mut registry,
+        host_a(),
+        BadRequest {
+            callee: ranged(),
+            arguments: vec![int(1), int(2)],
+        },
+    );
+    let mut m = meter(1_000);
+    let result = registry
+        .begin_call(host_a(), vec![int(1)], &(), &mut m)
+        .expect("admitted")
+        .run();
+    assert!(matches!(result, Err(CallFailure::Fault(_))));
+    // The valid request: the ranged callee at its bound and the population
+    // analogue at the declared maximum are applied, one call charge each.
+    for (callee, argument) in [(ranged(), 9), (population(), 3)] {
+        let (result, spend, resumed) = run_bad_request(callee, &[int(argument)]);
+        assert_eq!(completed_int(&result.expect("applied")), Some(argument));
+        assert_eq!(spend, 2);
+        assert_eq!(resumed, 2);
+    }
+}
+
+/// A membership check that cannot decide for want of storage ends the session
+/// as `CallFailure::Storage` with the callee's parameter index, before the
+/// child's call charge (FR-262-AC-11).
+#[test]
+fn an_undecidable_membership_ends_the_session_as_a_storage_failure() {
+    let (result, spend, resumed) = run_bad_request(storage(), &[int(1)]);
+    match result {
+        Err(CallFailure::Storage { parameter: 0, .. }) => {}
+        other => panic!("expected CallFailure::Storage at parameter 0, got {other:?}"),
+    }
+    assert_eq!((spend, resumed), (1, 1));
+}
+
+/// FR-262-AC-10, third clause: a cancellation between two steps does not stop
+/// a transition that makes no charge; the session ends at the first charge
+/// after it.
+#[test]
+fn a_chargeless_transition_runs_after_a_cancellation_and_the_next_charge_ends_the_session() {
+    let mut registry = Registry::new(Toy::default());
+    register(&mut registry, host_a(), Yielding { target: count() });
+    let cancel = Cancel::new();
+    let mut m = meter(1_000).with_cancel(cancel.clone());
+    let session = registry
+        .begin_call(host_a(), vec![int(2)], &(), &mut m)
+        .expect("admitted call");
+    // Enter the host (its call charge), then its first transition (a yield).
+    let session = runnable(session.step());
+    let session = runnable(session.step());
+    cancel.cancel(CancelCause::Deadline);
+    // The next transition saves the child request and charges nothing: it runs.
+    let session = runnable(session.step());
+    // The child's call charge is the first charge after the cancellation.
+    let Progress::Terminal(Ok(denied)) = session.step() else {
+        panic!("expected the incomplete result at the child's call charge");
+    };
+    assert!(incomplete_at_call(&denied));
+    assert_eq!(cancel.tripped(), Some(CancelCause::Deadline));
+    assert_eq!(spent(&m), 1);
 }

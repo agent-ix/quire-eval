@@ -102,7 +102,7 @@ pub enum CallFailure {
     #[error("internal fault in {}: {}", .0.stage(), .0.invariant())]
     Fault(InternalFault),
     /// The caller's [`quire_exact::Cancel`] handle was cancelled during a
-    /// supplied-value phase before the call (ADR-029 LC-3, FR-276). A charge
+    /// supplied-value run at `Begin`, before any charge (ADR-029 LC-3, FR-276). A charge
     /// the handle denies during an application is an `Incomplete` result, not
     /// this failure (FR-262). It returns no value.
     #[error("the call was cancelled: {0:?}")]

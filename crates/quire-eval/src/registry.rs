@@ -132,7 +132,7 @@ impl<C: CheckedClosure> Registry<C> {
         meter: &'a mut Meter,
     ) -> Result<Session<'a, C>, CallFailure> {
         self.closure
-            .admit_call(&callable, &arguments, environment)?;
+            .admit_call(&callable, &arguments, environment, meter)?;
         let entry = Entry::Root {
             callable,
             arguments,
@@ -156,7 +156,7 @@ impl<C: CheckedClosure> Registry<C> {
         meter: &'a mut Meter,
     ) -> Result<Session<'a, C>, CallFailure> {
         self.closure
-            .admit_expression(&expression, &parameters, environment)?;
+            .admit_expression(&expression, &parameters, environment, meter)?;
         let entry = Entry::Expression {
             expression,
             parameters,

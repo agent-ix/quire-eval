@@ -13,7 +13,7 @@ use quire_semantic_value::catalog::InternalFault;
 use quire_semantic_value::location::Location;
 
 use crate::body::{Body, ChildRequest, Resume, Transition};
-use crate::closure::CheckedClosure;
+use crate::closure::{CheckedClosure, RequestRefusal};
 use crate::registry::Bindings;
 use crate::result::{CallFailure, Evaluation, FamilyOutcome};
 
@@ -179,11 +179,17 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
             }) => {
                 // The caller's own input was admitted at `Begin`, so a request
                 // that fails admission is a broken body, not an input refusal.
-                if !self
+                match self
                     .closure
-                    .admits_request(&callee, &arguments, self.environment)
+                    .admit_request(&callee, &arguments, self.environment)
                 {
-                    return Err(fault("child-request-not-admitted").into());
+                    Ok(()) => {}
+                    Err(RequestRefusal::NotAdmitted) => {
+                        return Err(fault("child-request-not-admitted").into());
+                    }
+                    Err(RequestRefusal::Storage { parameter, failure }) => {
+                        return Err(CallFailure::Storage { parameter, failure });
+                    }
                 }
                 self.enter_call(callee, arguments, Some(site))
             }
