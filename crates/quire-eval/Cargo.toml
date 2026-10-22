@@ -1,0 +1,26 @@
+[package]
+name = "quire-eval"
+description = "The shared evaluation-core interface (ADR-011 layer E): begin an application of a checked closure, step its session, and register resumable host bodies, over the evaluation result vocabulary."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+name = "quire_eval"
+path = "src/lib.rs"
+
+[dependencies]
+quire-semantic-value = { git = "https://github.com/agent-ix/quire-semantic-value", branch = "main" }
+quire-exact = { git = "https://github.com/agent-ix/quire-exact", branch = "main" }
+thiserror = { version = "2.0.20", default-features = false }
+
+[dev-dependencies]
+# The ordered charge log, to assert the exact charge sequence of a run.
+quire-exact = { git = "https://github.com/agent-ix/quire-exact", branch = "main", features = ["test-support"] }
+
+[lints]
+workspace = true

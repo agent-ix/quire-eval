@@ -152,6 +152,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quire-eval"
+version = "0.1.0"
+dependencies = [
+ "quire-exact",
+ "quire-semantic-value",
+ "thiserror",
+]
+
+[[package]]
 name = "quire-exact"
 version = "0.1.0"
 source = "git+https://github.com/agent-ix/quire-exact?branch=main#72b254219fd65a058b8cf93cefadda1c4c249fca"

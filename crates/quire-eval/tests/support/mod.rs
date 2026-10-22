@@ -1,0 +1,334 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! A toy evaluator behind the `CheckedClosure` contract, and recording host
+//! bodies, for exercising the leaf through its public API alone.
+//!
+//! The toy language has three interpreted callables over non-negative
+//! integers:
+//!
+//! - `COUNT(n)`: `0` when `n = 0`, otherwise `COUNT(n - 1) + 1`;
+//! - `BOOM(n)`: always undefined, located at its call site;
+//! - `HOST_A` and `HOST_B`: admitted callables with no interpreted body, so
+//!   they can only run as registered host bodies.
+#![allow(dead_code)] // Each integration test uses a different part of this module.
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
+use quire_eval::{
+    Body, BodyFactory, CallFailure, CheckedClosure, ChildRequest, Evaluation, FamilyOutcome,
+    Resume, Signature, Transition,
+};
+use quire_exact::{
+    Cancel, Integer, LimitKind, Meter, NodeKey, Outcome, ScalarLimits, Undefined, Value, ValueType,
+};
+use quire_semantic_value::call::InputRefusal;
+use quire_semantic_value::location::{Location, Origin};
+
+/// A fixture node key: the toy closure's own identities.
+pub fn key(byte: u8) -> NodeKey {
+    NodeKey::decode_admitted([byte; 32])
+}
+
+pub fn count() -> NodeKey {
+    key(1)
+}
+pub fn boom() -> NodeKey {
+    key(2)
+}
+pub fn host_a() -> NodeKey {
+    key(3)
+}
+pub fn host_b() -> NodeKey {
+    key(4)
+}
+/// A key no function of the toy closure has.
+pub fn absent() -> NodeKey {
+    key(99)
+}
+
+pub fn int_signature() -> Signature {
+    Signature::new(vec![ValueType::Integer], ValueType::Integer)
+}
+
+pub fn int(n: u64) -> Value {
+    Value::Integer(Integer::from(n))
+}
+
+/// The call site every toy request is located at.
+pub fn site() -> Location {
+    Location::root(Origin::Expression)
+}
+
+/// The integer a completed evaluation holds.
+pub fn completed_int(evaluation: &Evaluation) -> Option<u64> {
+    match &evaluation.outcome {
+        FamilyOutcome::Evaluated(Outcome::Completed(Value::Integer(value))) => value.to_u64(),
+        _ => None,
+    }
+}
+
+/// A meter with `work_units` fuel and every other limit generous.
+pub fn meter(work_units: u64) -> Meter {
+    let limit = u64::from(u32::MAX);
+    Meter::new(ScalarLimits {
+        integer_bits: limit,
+        decimal_digits: limit,
+        scale_expansion: limit,
+        text_input_bytes: limit,
+        text_scalars: limit,
+        normalized_scalars: limit,
+        unit_edges: limit,
+        value_occurrences: limit,
+        work_units,
+        result_units: limit,
+    })
+}
+
+pub fn spent(meter: &Meter) -> u64 {
+    meter.consumed(LimitKind::WorkUnits)
+}
+
+pub fn no_cancel() -> Cancel {
+    Cancel::new()
+}
+
+pub enum Expression {
+    /// A literal: completes with no application and no charge.
+    Literal(u64),
+    /// Apply `callee` to `argument`, completing with its value.
+    Apply { callee: NodeKey, argument: u64 },
+}
+
+pub enum Task {
+    Count,
+    Boom,
+    Literal(u64),
+    Apply {
+        callee: NodeKey,
+        argument: u64,
+    },
+    Applied,
+    /// Admitted but never given an interpreted body.
+    Bodiless,
+}
+
+pub struct Toy;
+
+impl Toy {
+    fn admitted(callable: &NodeKey) -> bool {
+        [count(), boom(), host_a(), host_b()].contains(callable)
+    }
+}
+
+impl CheckedClosure for Toy {
+    type Expression = Expression;
+    type Environment = ();
+    type Task = (Task, Vec<Value>);
+
+    fn signature(&self, callable: &NodeKey) -> Option<Signature> {
+        Self::admitted(callable).then(int_signature)
+    }
+
+    fn admit_call(
+        &self,
+        callable: &NodeKey,
+        arguments: &[Value],
+        _environment: &(),
+    ) -> Result<(), CallFailure> {
+        if !Self::admitted(callable) {
+            return Err(InputRefusal::UnknownFunction("absent".into()).into());
+        }
+        if arguments.len() != 1 {
+            return Err(InputRefusal::Arity {
+                declared: 1,
+                supplied: arguments.len(),
+            }
+            .into());
+        }
+        Ok(())
+    }
+
+    fn admit_expression(
+        &self,
+        _expression: &Expression,
+        parameters: &[Value],
+        _environment: &(),
+    ) -> Result<(), CallFailure> {
+        if parameters.is_empty() {
+            Ok(())
+        } else {
+            Err(InputRefusal::Arity {
+                declared: 0,
+                supplied: parameters.len(),
+            }
+            .into())
+        }
+    }
+
+    fn bind_call(
+        &self,
+        callable: &NodeKey,
+        arguments: Vec<Value>,
+        _environment: &(),
+    ) -> Result<Self::Task, CallFailure> {
+        let task = if *callable == count() {
+            Task::Count
+        } else if *callable == boom() {
+            Task::Boom
+        } else {
+            Task::Bodiless
+        };
+        Ok((task, arguments))
+    }
+
+    fn bind_expression(
+        &self,
+        expression: &Expression,
+        parameters: Vec<Value>,
+        _environment: &(),
+    ) -> Result<Self::Task, CallFailure> {
+        let task = match expression {
+            Expression::Literal(n) => Task::Literal(*n),
+            Expression::Apply { callee, argument } => Task::Apply {
+                callee: *callee,
+                argument: *argument,
+            },
+        };
+        Ok((task, parameters))
+    }
+
+    fn advance(
+        &self,
+        task: &mut Self::Task,
+        delivered: Option<Evaluation>,
+        _environment: &(),
+        _meter: &mut Meter,
+    ) -> Result<Transition, CallFailure> {
+        let (state, arguments) = task;
+        let argument = arguments
+            .first()
+            .and_then(|value| match value {
+                Value::Integer(n) => n.to_u64(),
+                _ => None,
+            })
+            .unwrap_or_default();
+        match state {
+            Task::Count => match delivered {
+                Some(child) => Ok(Transition::Done(match completed_int(&child) {
+                    Some(value) => Evaluation::completed(int(value + 1)),
+                    // A non-completed child propagates unchanged.
+                    None => child,
+                })),
+                None if argument == 0 => Ok(Transition::Done(Evaluation::completed(int(0)))),
+                None => Ok(Transition::Call(ChildRequest {
+                    callee: count(),
+                    arguments: vec![int(argument - 1)],
+                    site: site(),
+                })),
+            },
+            Task::Boom => Ok(Transition::Done(Evaluation {
+                outcome: FamilyOutcome::Evaluated(Outcome::Undefined(Undefined::DivisionByZero)),
+                location: Some(site()),
+                losses: Vec::new(),
+            })),
+            Task::Literal(n) => Ok(Transition::Done(Evaluation::completed(int(*n)))),
+            Task::Apply { callee, argument } => {
+                let request = ChildRequest {
+                    callee: *callee,
+                    arguments: vec![int(*argument)],
+                    site: site(),
+                };
+                *state = Task::Applied;
+                Ok(Transition::Call(request))
+            }
+            Task::Applied => delivered
+                .map(Transition::Done)
+                .ok_or_else(|| fault("applied-frame-resumed-without-a-child")),
+            Task::Bodiless => Err(fault("callable-has-no-interpreted-body")),
+        }
+    }
+}
+
+fn fault(invariant: &'static str) -> CallFailure {
+    CallFailure::Fault(quire_semantic_value::catalog::InternalFault::new(
+        "toy", invariant,
+    ))
+}
+
+/// What a recording body factory observed.
+#[derive(Clone, Default)]
+pub struct Counts {
+    begun: Arc<AtomicUsize>,
+    resumed: Arc<AtomicUsize>,
+}
+
+impl Counts {
+    pub fn begun(&self) -> usize {
+        self.begun.load(Ordering::SeqCst)
+    }
+    pub fn resumed(&self) -> usize {
+        self.resumed.load(Ordering::SeqCst)
+    }
+}
+
+/// How a host body finishes after its child returns.
+#[derive(Clone, Copy)]
+pub enum Finish {
+    /// Return the child's evaluation unchanged (a direct-return caller).
+    Direct,
+    /// Return the child's integer plus the argument the body saved at start.
+    AddSavedArgument,
+}
+
+/// A host body that applies `target` to its argument and finishes per `finish`.
+pub struct Relay {
+    pub target: NodeKey,
+    pub finish: Finish,
+    pub counts: Counts,
+}
+
+impl BodyFactory for Relay {
+    fn begin(&self) -> Box<dyn Body> {
+        self.counts.begun.fetch_add(1, Ordering::SeqCst);
+        Box::new(RelayBody {
+            target: self.target,
+            finish: self.finish,
+            counts: self.counts.clone(),
+            saved: None,
+        })
+    }
+}
+
+struct RelayBody {
+    target: NodeKey,
+    finish: Finish,
+    counts: Counts,
+    saved: Option<u64>,
+}
+
+impl Body for RelayBody {
+    fn resume(&mut self, input: Resume, _meter: &mut Meter) -> Result<Transition, CallFailure> {
+        self.counts.resumed.fetch_add(1, Ordering::SeqCst);
+        match input {
+            Resume::Start(arguments) => {
+                let argument = arguments.first().cloned().unwrap_or_else(|| int(0));
+                if let Value::Integer(n) = &argument {
+                    self.saved = n.to_u64();
+                }
+                Ok(Transition::Call(ChildRequest {
+                    callee: self.target,
+                    arguments: vec![argument],
+                    site: site(),
+                }))
+            }
+            Resume::Child(child) => Ok(Transition::Done(match self.finish {
+                Finish::Direct => child,
+                Finish::AddSavedArgument => match (completed_int(&child), self.saved) {
+                    (Some(value), Some(saved)) => Evaluation::completed(int(value + saved)),
+                    _ => child,
+                },
+            })),
+            Resume::Again => Err(fault("relay-resumed-without-input")),
+        }
+    }
+}

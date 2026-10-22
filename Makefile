@@ -4,7 +4,7 @@
 
 CARGO ?= cargo
 # A target with no `std`: building for it proves quire-checked pulls in nothing
-# from `std` (FR-400-AC-9).
+# from `std` (FR-400-AC-9). `quire-eval` has no `std` feature at all (FR-401).
 NO_STD_TARGET ?= thumbv7em-none-eabi
 
 .PHONY: fmt fmt-check lint mint-probe test build-no-std deny docs ci clean
@@ -33,6 +33,7 @@ test:
 
 build-no-std:
 	$(CARGO) build -p quire-checked --no-default-features --target $(NO_STD_TARGET)
+	$(CARGO) build -p quire-eval --target $(NO_STD_TARGET)
 
 deny:
 	$(CARGO) deny check
