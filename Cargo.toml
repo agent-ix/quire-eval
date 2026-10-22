@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/quire-checked"]
+members = ["crates/quire-checked", "crates/quire-eval"]
 
 [workspace.package]
 version = "0.1.0"
@@ -18,8 +18,9 @@ codegen-units = 1
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"
-# `mint_probe` builds the FR-400-AC-6 fixture (`make mint-probe`).
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(mint_probe)"] }
+# `mint_probe` builds the FR-400-AC-6 fixture (`make mint-probe`); `seam_probe`
+# builds make every match over a seam enum non-exhaustive (FR-063).
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(mint_probe)", "cfg(seam_probe)"] }
 
 [workspace.lints.clippy]
 all = "deny"
