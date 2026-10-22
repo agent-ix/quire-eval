@@ -7,9 +7,10 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use quire_exact::{Meter, NodeKey, Value};
+use quire_semantic_value::catalog::InternalFault;
 use quire_semantic_value::location::Location;
 
-use crate::result::{CallFailure, Evaluation};
+use crate::result::Evaluation;
 
 /// A body's request that the scheduler apply a callee.
 ///
@@ -64,14 +65,17 @@ pub enum Transition {
 /// The `meter` is the session's one meter, lent for this transition. A body
 /// charges its own kernel work through it, at the charge points the
 /// reference evaluator uses, and reports a denied charge by returning
-/// `Done` with the located incomplete evaluation.
+/// `Done` with the located incomplete evaluation. When the denial was the
+/// meter's cancellation handle, the session ends with
+/// `CallFailure::Cancelled` instead, whichever transition observed it.
 pub trait Body: Send {
     /// Run one finite transition.
     ///
     /// # Errors
     ///
-    /// A broken invariant of the body's own, as [`CallFailure::Fault`].
-    fn resume(&mut self, input: Resume, meter: &mut Meter) -> Result<Transition, CallFailure>;
+    /// A broken invariant of the body's own. Caller-input refusals are
+    /// admission's, never a body's, so the error type is the fault alone.
+    fn resume(&mut self, input: Resume, meter: &mut Meter) -> Result<Transition, InternalFault>;
 }
 
 /// Supplies fresh invocation state for each call of a registered callable.

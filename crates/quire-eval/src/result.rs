@@ -130,6 +130,12 @@ pub enum CallFailure {
     UnsupportedHelper(Box<UnsupportedHelperStop>),
 }
 
+impl From<InternalFault> for CallFailure {
+    fn from(fault: InternalFault) -> Self {
+        Self::Fault(fault)
+    }
+}
+
 impl From<SuppliedFailure> for CallFailure {
     fn from(failure: SuppliedFailure) -> Self {
         match failure {

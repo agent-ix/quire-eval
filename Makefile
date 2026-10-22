@@ -19,6 +19,7 @@ lint:
 	$(CARGO) clippy --workspace --all-targets -- -D warnings
 	$(CARGO) clippy --workspace --all-targets --all-features -- -D warnings
 	$(CARGO) clippy -p quire-checked --lib --no-default-features --target $(NO_STD_TARGET) -- -D warnings
+	$(CARGO) clippy -p quire-eval --lib --target $(NO_STD_TARGET) -- -D warnings
 
 # FR-400-AC-6: the fixture under `--cfg mint_probe` calls a banned mint, so
 # clippy MUST fail on it with "disallowed method"; the target passes only then.

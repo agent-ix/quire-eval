@@ -4,6 +4,7 @@
 use alloc::vec::Vec;
 
 use quire_exact::{Meter, NodeKey, Value};
+use quire_semantic_value::catalog::InternalFault;
 
 use crate::body::Transition;
 use crate::result::{CallFailure, Evaluation};
@@ -36,7 +37,9 @@ pub trait CheckedClosure {
 
     /// Validate an application of `callable` to `arguments`, before any
     /// charge: the callable is in the closure, the arguments are complete and
-    /// each is a value of its parameter type.
+    /// each is a value of its parameter type. The scheduler also calls this
+    /// for a body's nested request; any failure there is a broken body, and
+    /// the session reports it as an internal fault.
     ///
     /// # Errors
     ///
@@ -68,26 +71,26 @@ pub trait CheckedClosure {
     ///
     /// # Errors
     ///
-    /// A broken invariant, as [`CallFailure::Fault`].
+    /// A broken invariant.
     fn bind_call(
         &self,
         callable: &NodeKey,
         arguments: Vec<Value>,
         environment: &Self::Environment,
-    ) -> Result<Self::Task, CallFailure>;
+    ) -> Result<Self::Task, InternalFault>;
 
     /// Bind already-admitted `parameters` to `expression` and return its first
     /// interpreted frame. An expression root incurs no call charge.
     ///
     /// # Errors
     ///
-    /// A broken invariant, as [`CallFailure::Fault`].
+    /// A broken invariant.
     fn bind_expression(
         &self,
         expression: &Self::Expression,
         parameters: Vec<Value>,
         environment: &Self::Environment,
-    ) -> Result<Self::Task, CallFailure>;
+    ) -> Result<Self::Task, InternalFault>;
 
     /// Advance an interpreted frame by one finite transition.
     ///
@@ -101,12 +104,12 @@ pub trait CheckedClosure {
     ///
     /// # Errors
     ///
-    /// A broken invariant, as [`CallFailure::Fault`].
+    /// A broken invariant.
     fn advance(
         &self,
         task: &mut Self::Task,
         delivered: Option<Evaluation>,
         environment: &Self::Environment,
         meter: &mut Meter,
-    ) -> Result<Transition, CallFailure>;
+    ) -> Result<Transition, InternalFault>;
 }

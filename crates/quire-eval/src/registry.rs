@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::mem;
 
-use quire_exact::{Cancel, Meter, NodeKey, Value};
+use quire_exact::{Meter, NodeKey, Value};
 
 use crate::body::BodyFactory;
 use crate::closure::CheckedClosure;
@@ -115,7 +115,9 @@ impl<C: CheckedClosure> Registry<C> {
     ///
     /// Admission runs first and charges nothing. On success the registry is
     /// sealed before any factory invocation or charge, and the returned
-    /// session is bound to this closure, `environment`, `meter` and `cancel`.
+    /// session is bound to this closure, `environment` and `meter`. The
+    /// session observes the cancellation handle the meter carries, if any: a
+    /// meter without one is not cancellable.
     /// The call's `function.call` charge is the session's first transition.
     ///
     /// # Errors
@@ -128,17 +130,14 @@ impl<C: CheckedClosure> Registry<C> {
         arguments: Vec<Value>,
         environment: &'a C::Environment,
         meter: &'a mut Meter,
-        cancel: Cancel,
     ) -> Result<Session<'a, C>, CallFailure> {
         self.closure
             .admit_call(&callable, &arguments, environment)?;
-        let entry = Entry::Call {
+        let entry = Entry::Root {
             callable,
             arguments,
-            site: None,
-            admitted: true,
         };
-        Ok(self.session(entry, environment, meter, cancel))
+        Ok(self.session(entry, environment, meter))
     }
 
     /// Begin the evaluation of `expression` with the completed `parameters`.
@@ -155,7 +154,6 @@ impl<C: CheckedClosure> Registry<C> {
         parameters: Vec<Value>,
         environment: &'a C::Environment,
         meter: &'a mut Meter,
-        cancel: Cancel,
     ) -> Result<Session<'a, C>, CallFailure> {
         self.closure
             .admit_expression(&expression, &parameters, environment)?;
@@ -163,7 +161,7 @@ impl<C: CheckedClosure> Registry<C> {
             expression,
             parameters,
         };
-        Ok(self.session(entry, environment, meter, cancel))
+        Ok(self.session(entry, environment, meter))
     }
 
     fn session<'a>(
@@ -171,7 +169,6 @@ impl<C: CheckedClosure> Registry<C> {
         entry: Entry<C>,
         environment: &'a C::Environment,
         meter: &'a mut Meter,
-        cancel: Cancel,
     ) -> Session<'a, C> {
         let bindings = self.seal();
         Session::new(
@@ -180,17 +177,18 @@ impl<C: CheckedClosure> Registry<C> {
             entry,
             environment,
             meter,
-            cancel,
         )
     }
 
     /// Seal the registry (a no-op once sealed) and share its bindings.
     fn seal(&mut self) -> Arc<Bindings> {
-        let bindings = match mem::replace(&mut self.state, State::Sealed(Arc::default())) {
-            State::Open(bindings) => Arc::new(bindings),
-            State::Sealed(bindings) => bindings,
-        };
-        self.state = State::Sealed(Arc::clone(&bindings));
-        bindings
+        match &mut self.state {
+            State::Sealed(bindings) => Arc::clone(bindings),
+            State::Open(open) => {
+                let sealed = Arc::new(mem::take(open));
+                self.state = State::Sealed(Arc::clone(&sealed));
+                sealed
+            }
+        }
     }
 }
