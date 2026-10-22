@@ -1,0 +1,12 @@
+msrv = "1.98"
+cognitive-complexity-threshold = 30
+too-many-arguments-threshold = 8
+
+# `quire-checked` mints no kernel identity: only the checking stage mints a
+# `NodeKey` and only the model stage mints an `EffectiveId` or `PopulationId`
+# (QSpec FR-400-AC-6).
+disallowed-methods = [
+    { path = "quire_exact::NodeKey::from_digest", reason = "the checker mints node keys" },
+    { path = "quire_exact::EffectiveId::from_digest", reason = "the model stage mints declaration identities" },
+    { path = "quire_exact::PopulationId::from_digest", reason = "the model stage mints population identities" },
+]
