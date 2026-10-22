@@ -24,9 +24,9 @@ construct = []
 test-support = []
 
 [dependencies]
-quire-semantic-value = { git = "https://github.com/agent-ix/quire-semantic-value", branch = "main" }
-quire-exact = { git = "https://github.com/agent-ix/quire-exact", branch = "main" }
-quire-walk = { git = "https://github.com/agent-ix/quire-walk", branch = "main" }
+quire-semantic-value = { git = "https://github.com/agent-ix/quire-semantic-value", branch = "main", default-features = false }
+quire-exact = { git = "https://github.com/agent-ix/quire-exact", branch = "main", default-features = false }
+quire-walk = { git = "https://github.com/agent-ix/quire-walk", branch = "main", default-features = false }
 quire-canonical = { git = "https://github.com/agent-ix/quire-canonical", branch = "main", default-features = false }
 serde = { version = "1.0.228", default-features = false, features = ["derive", "alloc"] }
 thiserror = { version = "2.0.20", default-features = false }

@@ -23,9 +23,8 @@ license. External material is prohibited by default.
 These exclusions apply to ignored files, Git LFS, branches, issues, pull requests, commit
 messages, CI artifacts, and private repositories as well as the default branch.
 
-The project preflight rejects unreviewed file types by default. Add a format to its text
-allowlist only after deciding how its contents will be inspected; separately review any
-original binary asset before admitting its exact format.
+Review a new file format before admitting it: decide how its contents will be inspected,
+and review any original binary asset before admitting its exact format.
 
 ## Review
 

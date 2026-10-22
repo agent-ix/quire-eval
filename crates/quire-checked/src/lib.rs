@@ -18,3 +18,10 @@ extern crate std;
 /// The only constructors of a checked term. Enabled by the checker alone.
 #[cfg(feature = "construct")]
 pub mod construct {}
+
+/// FR-400-AC-6 fixture, built only by `make mint-probe`: clippy must refuse
+/// this banned identity mint. Never compiled in a normal build.
+#[cfg(mint_probe)]
+pub fn banned_mint() -> quire_exact::EffectiveId {
+    quire_exact::EffectiveId::from_digest([0; 32])
+}
