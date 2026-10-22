@@ -65,9 +65,9 @@ pub enum Transition {
 /// The `meter` is the session's one meter, lent for this transition. A body
 /// charges its own kernel work through it, at the charge points the
 /// reference evaluator uses, and reports a denied charge by returning
-/// `Done` with the located incomplete evaluation. When the denial was the
-/// meter's cancellation handle, the session ends with
-/// `CallFailure::Cancelled` instead, whichever transition observed it.
+/// `Done` with the located incomplete evaluation. That includes a charge the
+/// meter's cancellation handle denied: it is a denied charge like any other,
+/// and the handle's `tripped()` reports the cause.
 pub trait Body: Send {
     /// Run one finite transition.
     ///

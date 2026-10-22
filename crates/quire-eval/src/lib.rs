@@ -40,7 +40,7 @@ mod session;
 mod signature;
 
 pub use body::{Body, BodyFactory, ChildRequest, Resume, Transition};
-pub use closure::CheckedClosure;
+pub use closure::{CheckedClosure, RequestRefusal};
 pub use registry::{Admission, Registry};
 pub use result::{CallFailure, EvalOutcome, Evaluation, FamilyOutcome, FamilyResult};
 pub use session::{Progress, Session};

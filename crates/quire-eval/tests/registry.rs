@@ -19,7 +19,7 @@ fn relay(counts: &Counts) -> Relay {
     }
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn registration_decides_in_the_documented_order() {
     let mut registry = Registry::new(Toy::default());
@@ -52,7 +52,7 @@ fn registration_decides_in_the_documented_order() {
     assert!(!registry.is_sealed());
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn a_failed_begin_leaves_the_registry_open_and_a_successful_begin_seals_it() {
     let mut registry = Registry::new(Toy::default());
@@ -92,7 +92,7 @@ fn a_failed_begin_leaves_the_registry_open_and_a_successful_begin_seals_it() {
     assert!(registry.is_sealed(), "dropping a session never reopens it");
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn a_sealed_registry_keeps_its_bindings_for_every_session() {
     let mut registry = Registry::new(Toy::default());
@@ -135,7 +135,7 @@ fn a_sealed_registry_keeps_its_bindings_for_every_session() {
     assert_eq!((first.begun(), second.begun()), (2, 0));
 }
 
-/// Interface-level analogue (toy closure) of the criterion named in the test; the reference adapter in qsl-eval carries the criterion itself.
+/// Toy-closure test of the scheduler behaviour its name states.
 #[test]
 fn a_literal_expression_charges_no_call_and_a_step_is_not_a_charge() {
     let mut registry = Registry::new(Toy::default());
@@ -162,4 +162,22 @@ fn a_literal_expression_charges_no_call_and_a_step_is_not_a_charge() {
 
 fn spent(meter: &quire_exact::Meter) -> u64 {
     support::spent(meter)
+}
+
+/// A cancelled handle on the meter ends `Begin` with `Cancelled` before any
+/// charge, and leaves the registry open (FR-262: the supplied-value run polls
+/// the meter's handle).
+#[test]
+fn begin_observes_the_meters_cancelled_handle_before_any_charge() {
+    let mut registry = Registry::new(Toy::default());
+    let cancel = quire_exact::Cancel::new();
+    cancel.cancel(quire_exact::CancelCause::Deadline);
+    let mut m = meter(1_000).with_cancel(cancel);
+    let refused = registry.begin_call(count(), vec![int(1)], &(), &mut m);
+    assert!(matches!(
+        refused,
+        Err(CallFailure::Cancelled(quire_exact::CancelCause::Deadline))
+    ));
+    assert!(!registry.is_sealed());
+    assert_eq!(spent(&m), 0);
 }

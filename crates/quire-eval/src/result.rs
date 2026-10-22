@@ -101,9 +101,10 @@ pub enum CallFailure {
     /// outcome is `Outcome::Refused`.
     #[error("internal fault in {}: {}", .0.stage(), .0.invariant())]
     Fault(InternalFault),
-    /// The caller's [`quire_exact::Cancel`] handle was cancelled and the
-    /// application stopped at its next charge or transition (ADR-029 LC-3,
-    /// FR-276). It returns no value.
+    /// The caller's [`quire_exact::Cancel`] handle was cancelled during a
+    /// supplied-value run at `Begin`, before any charge (ADR-029 LC-3, FR-276). A charge
+    /// the handle denies during an application is an `Incomplete` result, not
+    /// this failure (FR-262). It returns no value.
     #[error("the call was cancelled: {0:?}")]
     Cancelled(CancelCause),
     /// An argument's membership in its parameter type was not decided because

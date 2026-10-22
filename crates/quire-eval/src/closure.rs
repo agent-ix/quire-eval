@@ -9,6 +9,24 @@ use quire_semantic_value::catalog::InternalFault;
 use crate::body::Transition;
 use crate::result::{CallFailure, Evaluation};
 use crate::signature::Signature;
+use quire_semantic_value::declaration::EnvironmentFailure;
+
+/// Why a body's nested request failed validation (FR-262).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RequestRefusal {
+    /// The callee is not admitted, the argument count differs from its
+    /// parameter count, or an argument is not a member of its parameter's
+    /// type: a broken body. The session ends as a `CallFailure::Fault`.
+    NotAdmitted,
+    /// A membership check could not decide for want of storage. The session
+    /// ends as [`CallFailure::Storage`] with this parameter index.
+    Storage {
+        /// The index of the callee's parameter.
+        parameter: usize,
+        /// The kernel's storage failure.
+        failure: EnvironmentFailure,
+    },
+}
 
 /// One checked closure, as an evaluator implementation exposes it to the
 /// leaf: the callables its checker admitted, and the interpreted
@@ -37,9 +55,12 @@ pub trait CheckedClosure {
 
     /// Validate an application of `callable` to `arguments`, before any
     /// charge: the callable is in the closure, the arguments are complete and
-    /// each is a value of its parameter type. The scheduler also calls this
-    /// for a body's nested request; any failure there is a broken body, and
-    /// the session reports it as an internal fault.
+    /// each is a value of its parameter type.
+    ///
+    /// `meter` is the session's meter. Its installed cancellation handle, if
+    /// any, is the handle a supplied-value run polls, so a cancelled handle
+    /// ends `Begin` with [`CallFailure::Cancelled`] before any charge. The
+    /// method charges nothing.
     ///
     /// # Errors
     ///
@@ -50,7 +71,29 @@ pub trait CheckedClosure {
         callable: &NodeKey,
         arguments: &[Value],
         environment: &Self::Environment,
+        meter: &Meter,
     ) -> Result<(), CallFailure>;
+
+    /// Validate a body's nested request to apply `callable` to `arguments`:
+    /// the callable is in the closure, the argument count is its parameter
+    /// count, and each argument is a member of its parameter type.
+    ///
+    /// This is not [`Self::admit_call`]: it runs no supplied-value run,
+    /// charges neither the meter nor a supplied-value budget, and observes
+    /// no cancellation. [`RequestRefusal::NotAdmitted`] is a broken body,
+    /// which the session reports as an internal fault, never as caller
+    /// input; [`RequestRefusal::Storage`] ends the session as
+    /// [`CallFailure::Storage`].
+    ///
+    /// # Errors
+    ///
+    /// The refusal above.
+    fn admit_request(
+        &self,
+        callable: &NodeKey,
+        arguments: &[Value],
+        environment: &Self::Environment,
+    ) -> Result<(), RequestRefusal>;
 
     /// Validate an evaluation of `expression` with `parameters`, before any
     /// charge.
@@ -63,6 +106,7 @@ pub trait CheckedClosure {
         expression: &Self::Expression,
         parameters: &[Value],
         environment: &Self::Environment,
+        meter: &Meter,
     ) -> Result<(), CallFailure>;
 
     /// Bind already-admitted `arguments` to the parameters of `callable` and

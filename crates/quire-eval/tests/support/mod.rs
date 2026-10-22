@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex};
 
 use quire_eval::{
     Body, BodyFactory, CallFailure, CheckedClosure, ChildRequest, Evaluation, FamilyOutcome,
-    Resume, Signature, Transition,
+    RequestRefusal, Resume, Signature, Transition,
 };
 use quire_exact::{
     Charge, ChargePoint, IeeeFlag, IeeeWidth, Integer, LimitKind, Meter, NodeKey, Outcome, Refusal,
@@ -29,6 +29,7 @@ use quire_exact::{
 };
 use quire_semantic_value::call::InputRefusal;
 use quire_semantic_value::catalog::InternalFault;
+use quire_semantic_value::declaration::{EnvironmentFailure, StorageRequest, StorageUnit};
 use quire_semantic_value::location::{Location, Origin};
 use quire_semantic_value::loss::{LocatedLoss, ValueLoss};
 
@@ -57,6 +58,19 @@ pub fn refuse() -> NodeKey {
 }
 pub fn lossy() -> NodeKey {
     key(7)
+}
+/// Analogue of a ranged parameter: admits arguments up to 9.
+pub fn ranged() -> NodeKey {
+    key(8)
+}
+/// Analogue of a storage-bound parameter: its membership never decides.
+pub fn storage() -> NodeKey {
+    key(9)
+}
+/// Analogue of a `Population` parameter of declared maximum 3: it admits only
+/// 3; 4 is the wrong maximum and 99 an id the environment does not resolve.
+pub fn population() -> NodeKey {
+    key(10)
 }
 /// A key no function of the toy closure has.
 pub fn absent() -> NodeKey {
@@ -176,6 +190,9 @@ impl Toy {
             add(),
             refuse(),
             lossy(),
+            ranged(),
+            storage(),
+            population(),
         ]
         .contains(callable)
     }
@@ -213,7 +230,11 @@ impl CheckedClosure for Toy {
         callable: &NodeKey,
         arguments: &[Value],
         _environment: &(),
+        meter: &Meter,
     ) -> Result<(), CallFailure> {
+        if let Some(cause) = meter.cancel().and_then(quire_exact::Cancel::cause) {
+            return Err(CallFailure::Cancelled(cause));
+        }
         if !Self::admitted(callable) {
             return Err(InputRefusal::UnknownFunction("absent".into()).into());
         }
@@ -227,11 +248,40 @@ impl CheckedClosure for Toy {
         Ok(())
     }
 
+    fn admit_request(
+        &self,
+        callable: &NodeKey,
+        arguments: &[Value],
+        _environment: &(),
+    ) -> Result<(), RequestRefusal> {
+        if !Self::admitted(callable) || arguments.len() != Self::arity(callable) {
+            return Err(RequestRefusal::NotAdmitted);
+        }
+        let first = integers(arguments).first().copied().unwrap_or_default();
+        if *callable == ranged() && first > 9 {
+            return Err(RequestRefusal::NotAdmitted);
+        }
+        if *callable == population() && first != 3 {
+            return Err(RequestRefusal::NotAdmitted);
+        }
+        if *callable == storage() {
+            return Err(RequestRefusal::Storage {
+                parameter: 0,
+                failure: EnvironmentFailure::Allocation(StorageRequest::new(
+                    8,
+                    StorageUnit::AdditionalElements,
+                )),
+            });
+        }
+        Ok(())
+    }
+
     fn admit_expression(
         &self,
         _expression: &Expression,
         parameters: &[Value],
         _environment: &(),
+        _meter: &Meter,
     ) -> Result<(), CallFailure> {
         if parameters.is_empty() {
             Ok(())
@@ -258,7 +308,7 @@ impl CheckedClosure for Toy {
             Task::Count
         } else if *callable == boom() {
             Task::Boom
-        } else if *callable == add() {
+        } else if *callable == add() || *callable == ranged() || *callable == population() {
             Task::Add
         } else if *callable == refuse() {
             Task::Refuse
@@ -544,6 +594,74 @@ impl Body for ChargingBody {
                 None => child,
             })),
             Resume::Again => Err(fault("charging-body-resumed-without-input")),
+        }
+    }
+}
+
+/// A host body that requests `callee` with `arguments` as given, however
+/// invalid, to exercise the scheduler's request validation.
+pub struct BadRequest {
+    pub callee: NodeKey,
+    pub arguments: Vec<Value>,
+}
+
+impl BodyFactory for BadRequest {
+    fn begin(&self) -> Box<dyn Body> {
+        Box::new(BadRequestBody {
+            callee: self.callee,
+            arguments: self.arguments.clone(),
+        })
+    }
+}
+
+struct BadRequestBody {
+    callee: NodeKey,
+    arguments: Vec<Value>,
+}
+
+impl Body for BadRequestBody {
+    fn resume(&mut self, _input: Resume, _meter: &mut Meter) -> Result<Transition, InternalFault> {
+        Ok(Transition::Call(ChildRequest {
+            callee: self.callee,
+            arguments: self.arguments.clone(),
+            site: site(),
+        }))
+    }
+}
+
+/// A host body that yields once (a chargeless `Continue`) before requesting
+/// `target` with its argument.
+pub struct Yielding {
+    pub target: NodeKey,
+}
+
+impl BodyFactory for Yielding {
+    fn begin(&self) -> Box<dyn Body> {
+        Box::new(YieldingBody {
+            target: self.target,
+            arguments: Vec::new(),
+        })
+    }
+}
+
+struct YieldingBody {
+    target: NodeKey,
+    arguments: Vec<Value>,
+}
+
+impl Body for YieldingBody {
+    fn resume(&mut self, input: Resume, _meter: &mut Meter) -> Result<Transition, InternalFault> {
+        match input {
+            Resume::Start(arguments) => {
+                self.arguments = arguments;
+                Ok(Transition::Continue)
+            }
+            Resume::Again => Ok(Transition::Call(ChildRequest {
+                callee: self.target,
+                arguments: self.arguments.clone(),
+                site: site(),
+            })),
+            Resume::Child(child) => Ok(Transition::Done(child)),
         }
     }
 }
