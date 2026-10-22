@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["crates/quire-checked"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.98"
+authors = ["Agent IX <peter@agent-ix.ai>"]
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/agent-ix/quire-eval"
+publish = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = "deny"

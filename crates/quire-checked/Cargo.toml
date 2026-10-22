@@ -1,0 +1,35 @@
+[package]
+name = "quire-checked"
+description = "The checked terms an evaluator reads (ADR-011 layer C): checked bodies, graphs, clause records and identities, split from the checker that builds them."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+name = "quire_checked"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+# `std` for the crate's own dependencies; without it the crate is `no_std` + `alloc`.
+std = ["serde/std", "thiserror/std"]
+# The `construct` module: the only constructors of a checked term. Only the
+# checker enables it (QSpec FR-400, "Checking authority").
+construct = []
+# Test-only fixtures. Only a `[dev-dependencies]` entry may enable it.
+test-support = []
+
+[dependencies]
+quire-semantic-value = { git = "https://github.com/agent-ix/quire-semantic-value", branch = "main" }
+quire-exact = { git = "https://github.com/agent-ix/quire-exact", branch = "main" }
+quire-walk = { git = "https://github.com/agent-ix/quire-walk", branch = "main" }
+quire-canonical = { git = "https://github.com/agent-ix/quire-canonical", branch = "main", default-features = false }
+serde = { version = "1.0.228", default-features = false, features = ["derive", "alloc"] }
+thiserror = { version = "2.0.20", default-features = false }
+
+[lints]
+workspace = true
