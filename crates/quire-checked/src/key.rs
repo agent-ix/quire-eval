@@ -14,8 +14,10 @@ use alloc::string::String;
 /// bytes, a proper prefix first. Field declaration order gives exactly that
 /// comparison under `derive(Ord)`.
 ///
-/// This crate mints no kernel identity (FR-400-AC-6): the model stage encodes
-/// a key into the preimages it hashes.
+/// This crate mints no kernel identity (FR-400-AC-6). The model stage keeps
+/// `declaration_key_wire` for the key's preimage view; identity minting and
+/// derivation validation belong to
+/// `EffectiveDeclarationPreimage::{identity, validate_derivation}`.
 ///
 /// quire:canonical
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
