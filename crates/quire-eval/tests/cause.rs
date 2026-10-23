@@ -29,6 +29,7 @@ fn incomplete_closure_and_only_not_one_fill_their_catalog_fields() {
     }
     .undefined_record();
     assert_eq!(closure.fields["closure"], "subtype");
+    assert_eq!(closure.fields["queried_type"], "T");
     assert_eq!(closure.fields["uncovered_subtypes"], "A, B");
     let only = StateModelUndefined::OnlyNotOne {
         population: "P".to_owned(),

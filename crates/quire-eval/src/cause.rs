@@ -17,6 +17,7 @@ use quire_semantic_value::catalog::{
 /// receiver reference and the call locus. The call locus is the evaluator's
 /// own [`crate::Evaluation::location`], not repeated here.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub struct PreconditionFailure {
     /// The called effective operation's unqualified member name.
     pub operation: String,
@@ -25,6 +26,23 @@ pub struct PreconditionFailure {
     pub selected: String,
     /// The receiver reference the call was made on.
     pub receiver: ObjectReference,
+}
+
+impl PreconditionFailure {
+    /// The failure of `operation`, where `selected` is the method the
+    /// receiver's runtime type linked to.
+    #[must_use]
+    pub fn new(
+        operation: impl Into<String>,
+        selected: impl Into<String>,
+        receiver: ObjectReference,
+    ) -> Self {
+        Self {
+            operation: operation.into(),
+            selected: selected.into(),
+            receiver,
+        }
+    }
 }
 
 /// A protocol reference expression (FR-308) reached evaluation. Its value is
