@@ -15,9 +15,22 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+pub mod integer_division;
+pub mod key;
+
 /// The only constructors of a checked term. Enabled by the checker alone.
 #[cfg(feature = "construct")]
-pub mod construct {}
+pub mod construct {
+    use quire_exact::DivisionProfile;
+
+    use crate::integer_division::AdmittedIntegerDivision;
+
+    /// The admitted `div`/`rem` law `profile`. Only the definition admission
+    /// calls it (FR-400, "Checking authority" rule 3).
+    pub fn admitted_integer_division(profile: DivisionProfile) -> AdmittedIntegerDivision {
+        AdmittedIntegerDivision { profile }
+    }
+}
 
 /// FR-400-AC-6 fixture, built only by `make mint-probe`: clippy must refuse
 /// this banned identity mint. Never compiled in a normal build.
