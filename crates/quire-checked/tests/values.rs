@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Behaviour of the moved values: `DeclarationKey`'s order and equality, and
 //! the admitted division law surviving construction.
+//!
+//! Backs FR-400 "Crate and dependencies" rule 3 (the `test-support` fixture)
+//! and "Checking authority" rule 2 (the `construct` constructor), with
+//! FR-400-AC-4's doctests in `src/integer_division.rs`.
 
 use quire_checked::key::DeclarationKey;
 

@@ -12,7 +12,7 @@ use quire_exact::DivisionProfile;
 ///
 /// A struct literal from another crate does not compile:
 ///
-/// ```compile_fail
+/// ```compile_fail,E0451
 /// use quire_checked::integer_division::AdmittedIntegerDivision;
 /// use quire_exact::DivisionProfile;
 /// let _ = AdmittedIntegerDivision { profile: DivisionProfile::Floor };
@@ -26,6 +26,10 @@ use quire_exact::DivisionProfile;
 ///     division.profile()
 /// }
 /// ```
+#[cfg_attr(
+    not(feature = "construct"),
+    doc = "\nWithout the `construct` feature there is no constructor to call. (This block is\ncompiled only in that configuration: with `construct` on it would compile.)\n\n```compile_fail,E0433\nuse quire_checked::construct::admitted_integer_division;\nuse quire_exact::DivisionProfile;\nlet _ = admitted_integer_division(DivisionProfile::Floor);\n```"
+)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct AdmittedIntegerDivision {
     pub(crate) profile: DivisionProfile,
@@ -37,16 +41,3 @@ impl AdmittedIntegerDivision {
         self.profile
     }
 }
-
-/// Without the `construct` feature there is no constructor to call. This item
-/// exists only in that configuration, so the doctest below never runs in the
-/// `--all-features` lane, where it would compile.
-///
-/// ```compile_fail
-/// use quire_checked::construct::admitted_integer_division;
-/// use quire_exact::DivisionProfile;
-/// let _ = admitted_integer_division(DivisionProfile::Floor);
-/// ```
-#[cfg(not(feature = "construct"))]
-#[doc(hidden)]
-pub struct ConstructOff;
