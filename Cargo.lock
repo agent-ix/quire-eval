@@ -145,7 +145,7 @@ version = "0.1.0"
 dependencies = [
  "quire-canonical",
  "quire-exact",
- "quire-semantic-value",
+ "quire-semantic-value 0.1.0 (git+https://github.com/agent-ix/quire-semantic-value?branch=main)",
  "quire-walk",
  "serde",
  "thiserror",
@@ -156,7 +156,7 @@ name = "quire-eval"
 version = "0.1.0"
 dependencies = [
  "quire-exact",
- "quire-semantic-value",
+ "quire-semantic-value 0.1.0 (git+https://github.com/agent-ix/quire-semantic-value?branch=ir-588-s4-sv)",
  "thiserror",
 ]
 
@@ -172,6 +172,17 @@ dependencies = [
  "once_cell",
  "thiserror",
  "unicode-normalization",
+]
+
+[[package]]
+name = "quire-semantic-value"
+version = "0.1.0"
+source = "git+https://github.com/agent-ix/quire-semantic-value?branch=ir-588-s4-sv#e331dd0af0723e3c0b036a02702bed9f3b913ac4"
+dependencies = [
+ "quire-canonical",
+ "quire-exact",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]

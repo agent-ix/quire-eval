@@ -33,14 +33,20 @@
 extern crate alloc;
 
 mod body;
+mod cause;
 mod closure;
+mod integer;
 mod registry;
 mod result;
 mod session;
 mod signature;
 
 pub use body::{Body, BodyFactory, ChildRequest, Resume, Transition};
+pub use cause::{
+    PreconditionFailure, ProtocolReferenceUnsupported, ReferenceUnresolved, StateModelUndefined,
+};
 pub use closure::{CheckedClosure, RequestRefusal};
+pub use integer::modulo;
 pub use registry::{Admission, Registry};
 pub use result::{CallFailure, EvalOutcome, Evaluation, FamilyOutcome, FamilyResult};
 pub use session::{Progress, Session};
