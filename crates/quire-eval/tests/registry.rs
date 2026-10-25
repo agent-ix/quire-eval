@@ -185,7 +185,9 @@ fn begin_observes_the_meters_cancelled_handle_before_any_charge() {
 /// Trace: FR-262-AC-13.
 #[test]
 fn missing_checked_body_root_refuses_begin_without_sealing_or_charging() {
-    let mut registry = Registry::new(Toy::without_root_site());
+    let toy = Toy::without_root_site();
+    let binds = toy.binds();
+    let mut registry = Registry::new(toy);
     let mut m = meter(1_000);
     let refused = registry.begin_call(count(), vec![int(1)], &(), &mut m);
     match refused {
@@ -197,6 +199,7 @@ fn missing_checked_body_root_refuses_begin_without_sealing_or_charging() {
     }
     assert!(!registry.is_sealed());
     assert_eq!(spent(&m), 0);
+    assert!(binds.lock().expect("bind log").is_empty());
     assert_eq!(
         registry.register(host_a(), &int_signature(), relay(&Counts::default())),
         Admission::Accepted,
@@ -207,7 +210,9 @@ fn missing_checked_body_root_refuses_begin_without_sealing_or_charging() {
 /// Trace: FR-262-AC-13.
 #[test]
 fn each_root_call_denial_uses_its_admitted_body_site() {
-    let mut registry = Registry::new(Toy::default());
+    let toy = Toy::default();
+    let binds = toy.binds();
+    let mut registry = Registry::new(toy);
     for callable in [count(), host_a()] {
         let mut m = meter(0);
         let result = registry
@@ -217,6 +222,7 @@ fn each_root_call_denial_uses_its_admitted_body_site() {
             .expect("a denied charge is an evaluation");
         assert_eq!(result.location, Some(root_site(&callable)));
         assert_eq!(spent(&m), 0);
+        assert!(binds.lock().expect("bind log").is_empty());
     }
     assert_ne!(root_site(&count()), root_site(&host_a()));
 }
@@ -225,6 +231,11 @@ fn each_root_call_denial_uses_its_admitted_body_site() {
 #[test]
 fn cancellation_after_begin_locates_the_denied_root_call() {
     let mut registry = Registry::new(Toy::default());
+    let counts = Counts::default();
+    assert_eq!(
+        registry.register(host_a(), &int_signature(), relay(&counts)),
+        Admission::Accepted
+    );
     let cancel = Cancel::new();
     let mut m = meter(1_000).with_cancel(cancel.clone());
     let session = registry
@@ -240,4 +251,9 @@ fn cancellation_after_begin_locates_the_denied_root_call() {
     assert_eq!(denied.limit_kind, LimitKind::WorkUnits);
     assert_eq!(cancel.tripped(), Some(CancelCause::Requested));
     assert_eq!(spent(&m), 0);
+    assert_eq!(
+        counts.begun(),
+        0,
+        "the denied call never begins its host body"
+    );
 }
