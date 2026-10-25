@@ -7,6 +7,7 @@ use alloc::vec::Vec;
 use core::mem;
 
 use quire_exact::{Meter, NodeKey, Value};
+use quire_semantic_value::catalog::InternalFault;
 
 use crate::body::BodyFactory;
 use crate::closure::CheckedClosure;
@@ -122,8 +123,9 @@ impl<C: CheckedClosure> Registry<C> {
     ///
     /// # Errors
     ///
-    /// The input failure of admission, before any charge. The registry stays
-    /// as it was.
+    /// The failure of admission, or a broken closure invariant when an
+    /// admitted callable has no checked body root location. Both occur before
+    /// any charge and leave the registry as it was.
     pub fn begin_call<'a>(
         &mut self,
         callable: NodeKey,
@@ -133,9 +135,13 @@ impl<C: CheckedClosure> Registry<C> {
     ) -> Result<Session<'a, C>, CallFailure> {
         self.closure
             .admit_call(&callable, &arguments, environment, meter)?;
+        let site = self.closure.root_call_site(&callable).ok_or_else(|| {
+            CallFailure::Fault(InternalFault::new("quire-eval", "root-call-site-absent"))
+        })?;
         let entry = Entry::Root {
             callable,
             arguments,
+            site,
         };
         Ok(self.session(entry, environment, meter))
     }

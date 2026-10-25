@@ -94,6 +94,15 @@ pub fn site() -> Location {
     Location::root(Origin::Expression)
 }
 
+/// The checked body root of an admitted callable in the toy closure.
+pub fn root_site(callable: &NodeKey) -> Location {
+    let index = usize::from(callable.as_bytes()[0]);
+    Location::root(Origin::Body {
+        function: format!("toy_{index}"),
+        index,
+    })
+}
+
 /// The call site of the request that applies `COUNT` to `argument`, so a
 /// denied call identifies how deep the run got.
 pub fn count_site(argument: u64) -> Location {
@@ -173,12 +182,21 @@ pub type Binds = Arc<Mutex<Vec<(NodeKey, Vec<u64>)>>>;
 #[derive(Default)]
 pub struct Toy {
     binds: Binds,
+    missing_root_site: bool,
 }
 
 impl Toy {
     /// The log of interpreted callables bound, in the order they were entered.
     pub fn binds(&self) -> Binds {
         Arc::clone(&self.binds)
+    }
+
+    /// An admitted closure with a broken root-location invariant.
+    pub fn without_root_site() -> Self {
+        Self {
+            missing_root_site: true,
+            ..Self::default()
+        }
     }
 
     fn admitted(callable: &NodeKey) -> bool {
@@ -223,6 +241,10 @@ impl CheckedClosure for Toy {
 
     fn signature(&self, callable: &NodeKey) -> Option<Signature> {
         Self::admitted(callable).then(|| signature_of_arity(Self::arity(callable)))
+    }
+
+    fn root_call_site(&self, callable: &NodeKey) -> Option<Location> {
+        (Self::admitted(callable) && !self.missing_root_site).then(|| root_site(callable))
     }
 
     fn admit_call(

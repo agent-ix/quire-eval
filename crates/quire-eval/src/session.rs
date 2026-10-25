@@ -23,6 +23,7 @@ pub(crate) enum Entry<C: CheckedClosure> {
     Root {
         callable: NodeKey,
         arguments: Vec<Value>,
+        site: Location,
     },
     /// A body's saved request, validated when it is entered.
     Request(ChildRequest),
@@ -171,7 +172,8 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
             Entry::Root {
                 callable,
                 arguments,
-            } => self.enter_call(callable, arguments, None),
+                site,
+            } => self.enter_call(callable, arguments, Some(site)),
             Entry::Request(ChildRequest {
                 callee,
                 arguments,
