@@ -29,3 +29,9 @@ Ticket IR-1007. Plan completion: not assessed. Quoin matrix is unavailable for t
 | ID | Severity | Summary | Refs |
 | --- | --- | --- | --- |
 | FND-001 | medium | The new zero-work and post-Begin cancellation tests assert location and zero meter spend but never observe body invocation. `host_a` has no registered factory in these tests and no `Toy::binds()` or invocation counter is asserted. A regression that enters or invokes a body before the denied `function.call` and still returns the incomplete result would pass, leaving FR-262-AC-13's explicit "no body invocation" clause unverified. Register a counting body for a denied root and assert it never begins, or inspect the interpreted bind log. | crates/quire-eval/tests/registry.rs:209,226 |
+
+## Dispositions
+
+| FND | outcome | reason |
+| --- | --- | --- |
+| FND-001 | fixed | Round 1, head 09e0c1d6c6a75b48fe73d169ed65c4f68961a13e: zero-work denial asserts the interpreted bind log stays empty for each callable; post-Begin cancellation registers a counting host body and asserts its factory never begins; missing-site refusal also asserts the bind log stays empty. |
