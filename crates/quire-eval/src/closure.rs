@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 
 use quire_exact::{Meter, NodeKey, Value};
 use quire_semantic_value::catalog::InternalFault;
+use quire_semantic_value::location::Location;
 
 use crate::body::Transition;
 use crate::result::{CallFailure, Evaluation};
@@ -52,6 +53,13 @@ pub trait CheckedClosure {
     /// Only callables a caller may apply by identity are admitted; a
     /// synthesized candidate body that no checked call can name is not.
     fn signature(&self, callable: &NodeKey) -> Option<Signature>;
+
+    /// The checked body root location of `callable` in its declaring package,
+    /// or `None` if the admitted callable has no such location.
+    ///
+    /// `Begin` treats an absent location after admission as a broken closure
+    /// invariant, before sealing the registry or charging the meter.
+    fn root_call_site(&self, callable: &NodeKey) -> Option<Location>;
 
     /// Validate an application of `callable` to `arguments`, before any
     /// charge: the callable is in the closure, the arguments are complete and
