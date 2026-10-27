@@ -157,7 +157,7 @@ fn body_failures_preserve_variants_categories_and_prior_charges_through_run_and_
             let Err(CallFailure::Body(found)) = result else {
                 panic!("body failure remains a typed call failure: {result:?}");
             };
-            assert_eq!(found, expected, "the owner payload is unchanged");
+            assert_eq!(found.as_ref(), &expected, "the owner payload is unchanged");
             assert_eq!(CallFailure::Body(found).category(), category);
             assert_eq!(
                 consumed, 2,

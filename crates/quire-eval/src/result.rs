@@ -104,9 +104,10 @@ pub enum CallFailure {
     Fault(InternalFault),
     /// A checked body returned a typed QSV environment failure or its own
     /// invariant fault. This preserves the body-side source of the failure,
-    /// including QSV refusal and resource-exhaustion payloads.
+    /// including QSV refusal and resource-exhaustion payloads. The box keeps
+    /// this public error below the application's by-value error-size bound.
     #[error(transparent)]
-    Body(#[from] BodyFailure),
+    Body(Box<BodyFailure>),
     /// The caller's [`quire_exact::Cancel`] handle was cancelled during a
     /// supplied-value run at `Begin`, before any charge (ADR-029 LC-3, FR-276). A charge
     /// the handle denies during an application is an `Incomplete` result, not
@@ -143,6 +144,12 @@ impl From<InternalFault> for CallFailure {
     }
 }
 
+impl From<BodyFailure> for CallFailure {
+    fn from(failure: BodyFailure) -> Self {
+        Self::Body(Box::new(failure))
+    }
+}
+
 impl From<SuppliedFailure> for CallFailure {
     fn from(failure: SuppliedFailure) -> Self {
         match failure {
@@ -168,12 +175,14 @@ impl CallFailure {
         match self {
             Self::Input(_) => Category::Refusal,
             Self::Fault(fault) => fault.category(),
-            Self::Body(BodyFailure::Fault(fault)) => fault.category(),
-            Self::Body(BodyFailure::QsvEnvironment { failure, .. }) => match failure {
-                EnvironmentFailure::Refused(_) => Category::Refusal,
-                EnvironmentFailure::Limit(_)
-                | EnvironmentFailure::Allocation(_)
-                | EnvironmentFailure::Capacity(_) => Category::Incomplete,
+            Self::Body(body) => match body.as_ref() {
+                BodyFailure::Fault(fault) => fault.category(),
+                BodyFailure::QsvEnvironment { failure, .. } => match failure {
+                    EnvironmentFailure::Refused(_) => Category::Refusal,
+                    EnvironmentFailure::Limit(_)
+                    | EnvironmentFailure::Allocation(_)
+                    | EnvironmentFailure::Capacity(_) => Category::Incomplete,
+                },
             },
             Self::Cancelled(_) | Self::Storage { .. } => Category::Incomplete,
             Self::Supplied(stop) => match stop.cause {
