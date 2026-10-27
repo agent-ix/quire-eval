@@ -41,7 +41,7 @@ mod result;
 mod session;
 mod signature;
 
-pub use body::{Body, BodyFactory, ChildRequest, Resume, Transition};
+pub use body::{Body, BodyFactory, BodyFailure, ChildRequest, Resume, Transition};
 pub use cause::{
     PreconditionFailure, ProtocolReferenceUnsupported, ReferenceUnresolved, StateModelUndefined,
 };

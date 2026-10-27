@@ -6,11 +6,62 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use quire_exact::{Meter, NodeKey, Value};
+use quire_exact::{Cancel, CancelCause, Meter, NodeKey, Value};
 use quire_semantic_value::catalog::InternalFault;
+use quire_semantic_value::declaration::{EnvironmentFailure, EnvironmentLimitKind};
 use quire_semantic_value::location::Location;
 
 use crate::result::Evaluation;
+
+/// A failure returned by a checked body while it is producing one transition.
+///
+/// QSV environment failures remain distinct from faults in the body's own
+/// invariants. The cancellation snapshot is populated only for a `WorkUnits`
+/// limit and only when the exact cancellation handle used by that QSV
+/// operation reports that a charge saw its cancellation.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum BodyFailure {
+    /// Type-environment construction or membership failed in QSV.
+    #[error("QSV type environment failed: {failure:?}")]
+    QsvEnvironment {
+        /// The unchanged QSV failure and its full payload.
+        failure: EnvironmentFailure,
+        /// The exact cancellation observed by the QSV operation, if any.
+        cancellation: Option<CancelCause>,
+    },
+    /// A genuine invariant fault in the body implementation.
+    #[error("internal fault in {}: {}", .0.stage(), .0.invariant())]
+    Fault(InternalFault),
+}
+
+impl BodyFailure {
+    /// Preserve a QSV failure and snapshot cancellation from the same handle
+    /// used by the failed operation. Cancellation is meaningful only when a
+    /// `WorkUnits` limit was reached; other limit kinds and failure variants
+    /// carry no cancellation cause.
+    #[must_use]
+    pub fn qsv_environment(failure: EnvironmentFailure, cancel: Option<&Cancel>) -> Self {
+        let cancellation = match &failure {
+            EnvironmentFailure::Limit(limit) if limit.kind() == EnvironmentLimitKind::WorkUnits => {
+                cancel.and_then(Cancel::tripped)
+            }
+            EnvironmentFailure::Limit(_)
+            | EnvironmentFailure::Refused(_)
+            | EnvironmentFailure::Allocation(_)
+            | EnvironmentFailure::Capacity(_) => None,
+        };
+        Self::QsvEnvironment {
+            failure,
+            cancellation,
+        }
+    }
+}
+
+impl From<InternalFault> for BodyFailure {
+    fn from(fault: InternalFault) -> Self {
+        Self::Fault(fault)
+    }
+}
 
 /// A body's request that the scheduler apply a callee.
 ///
@@ -65,17 +116,17 @@ pub enum Transition {
 /// The `meter` is the session's one meter, lent for this transition. A body
 /// charges its own kernel work through it, at the charge points the
 /// reference evaluator uses, and reports a denied charge by returning
-/// `Done` with the located incomplete evaluation. That includes a charge the
-/// meter's cancellation handle denied: it is a denied charge like any other,
-/// and the handle's `tripped()` reports the cause.
+/// `Done` with the located incomplete evaluation. A failure constructing or
+/// querying a QSV type environment is returned as [`BodyFailure::QsvEnvironment`];
+/// it must not be converted to a completed value or an internal fault. Only a
+/// broken body invariant is [`BodyFailure::Fault`].
 pub trait Body: Send {
     /// Run one finite transition.
     ///
     /// # Errors
     ///
-    /// A broken invariant of the body's own. Caller-input refusals are
-    /// admission's, never a body's, so the error type is the fault alone.
-    fn resume(&mut self, input: Resume, meter: &mut Meter) -> Result<Transition, InternalFault>;
+    /// A typed QSV environment failure or a broken invariant of the body.
+    fn resume(&mut self, input: Resume, meter: &mut Meter) -> Result<Transition, BodyFailure>;
 }
 
 /// Supplies fresh invocation state for each call of a registered callable.
