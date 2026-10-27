@@ -20,8 +20,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use quire_eval::{
-    Body, BodyFactory, CallFailure, CheckedClosure, ChildRequest, Evaluation, FamilyOutcome,
-    RequestRefusal, Resume, Signature, Transition,
+    Body, BodyFactory, BodyFailure, CallFailure, CheckedClosure, ChildRequest, Evaluation,
+    FamilyOutcome, RequestRefusal, Resume, Signature, Transition,
 };
 use quire_exact::{
     Charge, ChargePoint, IeeeFlag, IeeeWidth, Integer, LimitKind, Meter, NodeKey, Outcome, Refusal,
@@ -526,7 +526,7 @@ struct RelayBody {
 }
 
 impl Body for RelayBody {
-    fn resume(&mut self, input: Resume, _meter: &mut Meter) -> Result<Transition, InternalFault> {
+    fn resume(&mut self, input: Resume, _meter: &mut Meter) -> Result<Transition, BodyFailure> {
         self.counts.resumed.fetch_add(1, Ordering::SeqCst);
         match input {
             Resume::Start(arguments) => {
@@ -547,7 +547,7 @@ impl Body for RelayBody {
                     _ => child,
                 },
             })),
-            Resume::Again => Err(fault("relay-resumed-without-input")),
+            Resume::Again => Err(fault("relay-resumed-without-input").into()),
         }
     }
 }
@@ -593,7 +593,7 @@ impl ChargingBody {
 }
 
 impl Body for ChargingBody {
-    fn resume(&mut self, input: Resume, meter: &mut Meter) -> Result<Transition, InternalFault> {
+    fn resume(&mut self, input: Resume, meter: &mut Meter) -> Result<Transition, BodyFailure> {
         self.counts.resumed.fetch_add(1, Ordering::SeqCst);
         if let Some(done) = Self::work(meter) {
             return Ok(done);
@@ -615,7 +615,7 @@ impl Body for ChargingBody {
                 },
                 None => child,
             })),
-            Resume::Again => Err(fault("charging-body-resumed-without-input")),
+            Resume::Again => Err(fault("charging-body-resumed-without-input").into()),
         }
     }
 }
@@ -642,7 +642,7 @@ struct BadRequestBody {
 }
 
 impl Body for BadRequestBody {
-    fn resume(&mut self, _input: Resume, _meter: &mut Meter) -> Result<Transition, InternalFault> {
+    fn resume(&mut self, _input: Resume, _meter: &mut Meter) -> Result<Transition, BodyFailure> {
         Ok(Transition::Call(ChildRequest {
             callee: self.callee,
             arguments: self.arguments.clone(),
@@ -672,7 +672,7 @@ struct YieldingBody {
 }
 
 impl Body for YieldingBody {
-    fn resume(&mut self, input: Resume, _meter: &mut Meter) -> Result<Transition, InternalFault> {
+    fn resume(&mut self, input: Resume, _meter: &mut Meter) -> Result<Transition, BodyFailure> {
         match input {
             Resume::Start(arguments) => {
                 self.arguments = arguments;

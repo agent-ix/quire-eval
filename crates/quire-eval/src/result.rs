@@ -16,6 +16,8 @@ use quire_semantic_value::supplied_stop::{
     SuppliedCause, SuppliedFailure, SuppliedStop, UnsupportedHelperStop,
 };
 
+use crate::body::BodyFailure;
+
 /// ADR-013 O-16: a family's own evaluation-time result. `Refused`, category
 /// `refusal`, holds a family-owned refusal cause; `Undefined`, category
 /// `undefined`, holds a family-owned undefined cause. Both are trait objects,
@@ -87,10 +89,9 @@ pub struct Evaluation {
     pub losses: Vec<LocatedLoss>,
 }
 
-/// FR-090 "Bad arguments are refused at admission; a broken invariant is an
-/// internal fault": the error of an application, split between an ordinary
-/// caller-input refusal admission catches and a broken S6a invariant
-/// admission cannot have let through, never conflated into one shape.
+/// The error of an application, preserving caller-input refusal, evaluator
+/// invariant faults, typed body-side QSV failures, and failures before or
+/// outside an outcome as distinct shapes.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum CallFailure {
     /// An argument refused at admission, before any S6a evaluation runs.
@@ -101,6 +102,11 @@ pub enum CallFailure {
     /// outcome is `Outcome::Refused`.
     #[error("internal fault in {}: {}", .0.stage(), .0.invariant())]
     Fault(InternalFault),
+    /// A checked body returned a typed QSV environment failure or its own
+    /// invariant fault. This preserves the body-side source of the failure,
+    /// including QSV refusal and resource-exhaustion payloads.
+    #[error(transparent)]
+    Body(#[from] BodyFailure),
     /// The caller's [`quire_exact::Cancel`] handle was cancelled during a
     /// supplied-value run at `Begin`, before any charge (ADR-029 LC-3, FR-276). A charge
     /// the handle denies during an application is an `Incomplete` result, not
@@ -154,13 +160,21 @@ impl From<SuppliedFailure> for CallFailure {
 }
 
 impl CallFailure {
-    /// FR-285: an admission refusal is a refusal, a broken S6a invariant an
-    /// internal failure, and a cancellation incomplete (ADR-013 O-16).
+    /// Admission and body-side QSV refusals are refusals; evaluator and body
+    /// invariant faults are internal failures; resource limits and
+    /// cancellations are incomplete (FR-285, FR-401).
     #[must_use]
     pub fn category(&self) -> Category {
         match self {
             Self::Input(_) => Category::Refusal,
             Self::Fault(fault) => fault.category(),
+            Self::Body(BodyFailure::Fault(fault)) => fault.category(),
+            Self::Body(BodyFailure::QsvEnvironment { failure, .. }) => match failure {
+                EnvironmentFailure::Refused(_) => Category::Refusal,
+                EnvironmentFailure::Limit(_)
+                | EnvironmentFailure::Allocation(_)
+                | EnvironmentFailure::Capacity(_) => Category::Incomplete,
+            },
             Self::Cancelled(_) | Self::Storage { .. } => Category::Incomplete,
             Self::Supplied(stop) => match stop.cause {
                 SuppliedCause::Input { .. } => Category::Refusal,
