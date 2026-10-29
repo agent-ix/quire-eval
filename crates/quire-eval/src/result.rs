@@ -4,11 +4,14 @@
 //! an outcome.
 
 use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::vec::Vec;
 
-use quire_exact::{CancelCause, Outcome, Value};
+use quire_exact::{CancelCause, NodeKey, Outcome, Value};
 use quire_semantic_value::call::InputRefusal;
-use quire_semantic_value::catalog::{CatalogCoded, Category, InternalFault, UndefinedCoded};
+use quire_semantic_value::catalog::{
+    CatalogCode, CatalogCoded, Category, InternalFault, UndefinedCoded,
+};
 use quire_semantic_value::declaration::EnvironmentFailure;
 use quire_semantic_value::location::Location;
 use quire_semantic_value::loss::LocatedLoss;
@@ -89,14 +92,59 @@ pub struct Evaluation {
     pub losses: Vec<LocatedLoss>,
 }
 
-/// The error of an application, preserving caller-input refusal, evaluator
-/// invariant faults, typed body-side QSV failures, and failures before or
-/// outside an outcome as distinct shapes.
+/// The locus named by an admission failure for a checked package call.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CallAdmissionLocus {
+    /// The selected checked node.
+    Node(NodeKey),
+    /// A member of the selected node, optionally at one list index.
+    Member {
+        /// The member name.
+        name: String,
+        /// The list position, when the member is indexed.
+        index: Option<usize>,
+    },
+    /// A supplied binder.
+    Binder(NodeKey),
+}
+
+/// The catalog code, cause and checked-package locus of a call admission
+/// failure. Admission failures occur before S6a and do not charge the meter.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CallAdmissionRecord {
+    /// The catalog code and cause pair.
+    pub code: CatalogCode,
+    /// The checked-package input that admission names.
+    pub locus: CallAdmissionLocus,
+}
+
+/// A caller-supplied checked-package input that admission rejected or could
+/// not decide before evaluation.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum CallAdmissionFailure {
+    /// Admission found a caller-input defect.
+    #[error("call admission refused: {0:?}")]
+    Refused(CallAdmissionRecord),
+    /// Admission lacked evidence required to decide the input.
+    #[error("call admission incomplete: {0:?}")]
+    Incomplete(CallAdmissionRecord),
+}
+
+/// The error of an application, preserving ordinary caller-input refusals,
+/// checked-package admission failures, evaluator invariant faults, typed
+/// body-side QSV failures, and failures before or outside an outcome as
+/// distinct shapes.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum CallFailure {
     /// An argument refused at admission, before any S6a evaluation runs.
     #[error(transparent)]
     Input(#[from] InputRefusal),
+    /// A checked-package-specific selection or supply was refused or left
+    /// incomplete before S6a. Its catalog record and node/member/binder locus
+    /// are preserved separately from function-argument [`Self::Input`] and
+    /// checked-body [`Self::Body`] failures.
+    #[error(transparent)]
+    Admission(Box<CallAdmissionFailure>),
     /// An S6a invariant broke (ADR-013 T-4): never a caller-input refusal,
     /// and never surfaced as a [`FamilyResult`] or as an `Evaluation` whose
     /// outcome is `Outcome::Refused`.
@@ -167,13 +215,17 @@ impl From<SuppliedFailure> for CallFailure {
 }
 
 impl CallFailure {
-    /// Admission and body-side QSV refusals are refusals; evaluator and body
-    /// invariant faults are internal failures; resource limits and
-    /// cancellations are incomplete (FR-285, FR-401).
+    /// Input and package-admission refusals, and body-side QSV refusals, are
+    /// refusals; evaluator and body invariant faults are internal failures;
+    /// resource limits and cancellations are incomplete (FR-285, FR-401).
     #[must_use]
     pub fn category(&self) -> Category {
         match self {
             Self::Input(_) => Category::Refusal,
+            Self::Admission(failure) => match failure.as_ref() {
+                CallAdmissionFailure::Refused(_) => Category::Refusal,
+                CallAdmissionFailure::Incomplete(_) => Category::Incomplete,
+            },
             Self::Fault(fault) => fault.category(),
             Self::Body(body) => match body.as_ref() {
                 BodyFailure::Fault(fault) => fault.category(),
@@ -206,5 +258,76 @@ impl Evaluation {
             location: None,
             losses: Vec::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::string::String;
+    use quire_semantic_value::catalog::CatalogCode;
+
+    /// Admission refusals remain distinct from ordinary argument and body failures,
+    /// and preserve their catalog pair and member locus.
+    #[test]
+    fn admission_refusal_preserves_catalog_and_member_locus() {
+        let failure = CallFailure::Admission(Box::new(CallAdmissionFailure::Refused(
+            CallAdmissionRecord {
+                code: CatalogCode::new("invalid_runtime_input", "malformed-declaration"),
+                locus: CallAdmissionLocus::Member {
+                    name: String::from("condition"),
+                    index: None,
+                },
+            },
+        )));
+
+        assert_eq!(failure.category(), Category::Refusal);
+        assert!(matches!(
+            &failure,
+            CallFailure::Admission(payload)
+                if matches!(payload.as_ref(), CallAdmissionFailure::Refused(record)
+                    if record.code == CatalogCode::new("invalid_runtime_input", "malformed-declaration")
+                        && record.locus == CallAdmissionLocus::Member {
+                            name: String::from("condition"),
+                            index: None,
+                        })
+        ));
+        assert_ne!(
+            failure,
+            CallFailure::Input(InputRefusal::WrongValueKind { parameter: 0 })
+        );
+    }
+
+    /// Incomplete admission is distinct from refusal and retains the exact member/index
+    /// locus that needs evidence.
+    #[test]
+    fn incomplete_admission_preserves_member_index_locus() {
+        let failure = CallFailure::Admission(Box::new(CallAdmissionFailure::Incomplete(
+            CallAdmissionRecord {
+                code: CatalogCode::new("unavailable_observation", "missing-required-artifact"),
+                locus: CallAdmissionLocus::Member {
+                    name: String::from("captures"),
+                    index: Some(2),
+                },
+            },
+        )));
+
+        assert_eq!(failure.category(), Category::Incomplete);
+        assert!(matches!(
+            &failure,
+            CallFailure::Admission(payload)
+                if matches!(payload.as_ref(), CallAdmissionFailure::Incomplete(record)
+                    if record.code == CatalogCode::new(
+                        "unavailable_observation",
+                        "missing-required-artifact",
+                    ) && record.locus == CallAdmissionLocus::Member {
+                        name: String::from("captures"),
+                        index: Some(2),
+                    })
+        ));
+        assert_ne!(
+            failure,
+            CallFailure::Fault(InternalFault::new("S6a", "bad-input"))
+        );
     }
 }

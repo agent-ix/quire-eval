@@ -48,6 +48,9 @@ pub use cause::{
 pub use closure::{CheckedClosure, RequestRefusal};
 pub use integer::modulo;
 pub use registry::{Admission, Registry};
-pub use result::{CallFailure, EvalOutcome, Evaluation, FamilyOutcome, FamilyResult};
+pub use result::{
+    CallAdmissionFailure, CallAdmissionLocus, CallAdmissionRecord, CallFailure, EvalOutcome,
+    Evaluation, FamilyOutcome, FamilyResult,
+};
 pub use session::{Progress, Session};
 pub use signature::Signature;
