@@ -89,7 +89,7 @@ pub enum Resume {
     /// again with nothing new to deliver.
     Again,
     /// The matching child's evaluation, delivered once.
-    Child(Evaluation),
+    Child(Box<Evaluation>),
 }
 
 /// What one finite body transition decided. The body has committed its state

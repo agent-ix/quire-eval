@@ -120,7 +120,7 @@ dependencies = [
 [[package]]
 name = "quire-canonical"
 version = "0.3.0"
-source = "git+https://github.com/agent-ix/quire-canonical?branch=main#e1e782619cf05cb81bb23fbe9ef9fb320cfb69ee"
+source = "git+https://github.com/agent-ix/quire-canonical?branch=main#35987f1dea33edf13bdf8e6a39153a802503f5a0"
 dependencies = [
  "quire-canonical-derive",
  "ryu-js",
@@ -132,7 +132,7 @@ dependencies = [
 [[package]]
 name = "quire-canonical-derive"
 version = "0.3.0"
-source = "git+https://github.com/agent-ix/quire-canonical?branch=main#e1e782619cf05cb81bb23fbe9ef9fb320cfb69ee"
+source = "git+https://github.com/agent-ix/quire-canonical?branch=main#35987f1dea33edf13bdf8e6a39153a802503f5a0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -163,7 +163,7 @@ dependencies = [
 [[package]]
 name = "quire-exact"
 version = "0.1.0"
-source = "git+https://github.com/agent-ix/quire-exact?branch=main#ab59015994daf05c8c42252daa6a71f06e3936d9"
+source = "git+https://github.com/agent-ix/quire-exact?branch=main#39f257925885087fb94bc9e8949c641b923c8c68"
 dependencies = [
  "allocator-api2",
  "num-bigint",
@@ -177,11 +177,10 @@ dependencies = [
 [[package]]
 name = "quire-semantic-value"
 version = "0.1.0"
-source = "git+https://github.com/agent-ix/quire-semantic-value?branch=main#472e609f6ec608d1b5093ba70955ae29d2704389"
+source = "git+https://github.com/agent-ix/quire-semantic-value?rev=520afa73ba37a659a210a563abdc217bc49282ae#520afa73ba37a659a210a563abdc217bc49282ae"
 dependencies = [
  "quire-canonical",
  "quire-exact",
- "serde",
  "thiserror",
 ]
 

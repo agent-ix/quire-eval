@@ -14,7 +14,7 @@ use alloc::string::String;
 /// bytes, a proper prefix first. Field declaration order gives exactly that
 /// comparison under `derive(Ord)`.
 ///
-/// This crate derives no kernel identity (FR-400-AC-6). The model stage keeps
+/// The model stage keeps
 /// `declaration_key_wire` for the key's wire view.
 ///
 /// quire:canonical

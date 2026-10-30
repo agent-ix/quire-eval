@@ -547,10 +547,10 @@ impl Body for RelayBody {
                 }))
             }
             Resume::Child(child) => Ok(Transition::Done(match self.finish {
-                Finish::Direct => child,
+                Finish::Direct => *child,
                 Finish::AddSavedArgument => match (completed_int(&child), self.saved) {
                     (Some(value), Some(saved)) => Evaluation::completed(int(value + saved)),
-                    _ => child,
+                    _ => *child,
                 },
             })),
             Resume::Again => Err(fault("relay-resumed-without-input").into()),
@@ -619,7 +619,7 @@ impl Body for ChargingBody {
                     location: None,
                     losses: child.losses,
                 },
-                None => child,
+                None => *child,
             })),
             Resume::Again => Err(fault("charging-body-resumed-without-input").into()),
         }
@@ -689,7 +689,7 @@ impl Body for YieldingBody {
                 arguments: self.arguments.clone(),
                 site: site(),
             })),
-            Resume::Child(child) => Ok(Transition::Done(child)),
+            Resume::Child(child) => Ok(Transition::Done(*child)),
         }
     }
 }
