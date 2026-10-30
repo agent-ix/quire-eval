@@ -15,12 +15,12 @@ path = "src/lib.rs"
 
 [dependencies]
 quire-semantic-value = { git = "https://github.com/agent-ix/quire-semantic-value", branch = "main", default-features = false }
-quire-exact = { git = "https://github.com/agent-ix/quire-exact", branch = "main", default-features = false }
+quire-exact = { git = "https://github.com/agent-ix/quire-exact", rev = "ad19a464803d121dde99a1185f62420bf59ffe99", default-features = false }
 thiserror = { version = "2.0.20", default-features = false }
 
 [dev-dependencies]
 # The ordered charge log, to assert the exact charge sequence of a run.
-quire-exact = { git = "https://github.com/agent-ix/quire-exact", branch = "main", default-features = false, features = ["test-support"] }
+quire-exact = { git = "https://github.com/agent-ix/quire-exact", rev = "ad19a464803d121dde99a1185f62420bf59ffe99", default-features = false, features = ["test-support"] }
 
 [lints]
 workspace = true
