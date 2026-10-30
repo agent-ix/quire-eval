@@ -216,7 +216,7 @@ fn each_root_call_denial_uses_its_admitted_body_site() {
     for callable in [count(), host_a()] {
         let mut m = meter(0);
         let result = registry
-            .begin_call(callable, vec![int(1)], &(), &mut m)
+            .begin_call(callable.clone(), vec![int(1)], &(), &mut m)
             .expect("admitted root")
             .run()
             .expect("a denied charge is an evaluation");

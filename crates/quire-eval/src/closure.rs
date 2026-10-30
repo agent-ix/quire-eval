@@ -37,7 +37,7 @@ pub enum RequestRefusal {
 /// package or model type: the checked-expression input, the admitted object
 /// environment and the saved state of an interpreted frame are types the
 /// implementation chooses, and the leaf moves them without inspecting them.
-/// A callable is identified by the kernel [`NodeKey`] the checker minted for
+/// A callable is identified by the structural [`NodeKey`] the checker admitted for
 /// it; the leaf resolves no name.
 pub trait CheckedClosure {
     /// A checked expression the closure can evaluate with parameters.

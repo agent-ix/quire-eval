@@ -24,8 +24,8 @@ use quire_eval::{
     FamilyOutcome, RequestRefusal, Resume, Signature, Transition,
 };
 use quire_exact::{
-    Charge, ChargePoint, IeeeFlag, IeeeWidth, Integer, LimitKind, Meter, NodeKey, Outcome, Refusal,
-    ScalarLimits, Undefined, Value, ValueType,
+    Charge, ChargePoint, IeeeFlag, IeeeWidth, Integer, LimitKind, Meter, NodeKey, Outcome,
+    PathSegment, Refusal, ScalarLimits, Undefined, Value, ValueType,
 };
 use quire_semantic_value::call::InputRefusal;
 use quire_semantic_value::catalog::InternalFault;
@@ -33,9 +33,15 @@ use quire_semantic_value::declaration::{EnvironmentFailure, StorageRequest, Stor
 use quire_semantic_value::location::{Location, Origin};
 use quire_semantic_value::loss::{LocatedLoss, ValueLoss};
 
-/// A fixture node key: the toy closure's own identities.
-pub fn key(byte: u8) -> NodeKey {
-    NodeKey::decode_admitted([byte; 32])
+/// A fixture node key: the toy closure's own structural identities, the
+/// `ordinal`th node of the toy package.
+pub fn key(ordinal: u8) -> NodeKey {
+    NodeKey::new(
+        "toy",
+        vec![PathSegment::Text("closure".into())],
+        u64::from(ordinal),
+    )
+    .expect("a toy node identity is well formed")
 }
 
 pub fn count() -> NodeKey {
@@ -96,7 +102,7 @@ pub fn site() -> Location {
 
 /// The checked body root of an admitted callable in the toy closure.
 pub fn root_site(callable: &NodeKey) -> Location {
-    let index = usize::from(callable.as_bytes()[0]);
+    let index = usize::try_from(callable.ordinal()).expect("toy ordinals fit usize");
     Location::root(Origin::Body {
         function: format!("toy_{index}"),
         index,
@@ -325,7 +331,7 @@ impl CheckedClosure for Toy {
         self.binds
             .lock()
             .expect("bind log")
-            .push((*callable, integers(&arguments)));
+            .push((callable.clone(), integers(&arguments)));
         let task = if *callable == count() {
             Task::Count
         } else if *callable == boom() {
@@ -351,13 +357,13 @@ impl CheckedClosure for Toy {
         let task = match expression {
             Expression::Literal(n) => Task::Literal(*n),
             Expression::Apply { callee, argument } => Task::Apply {
-                callee: *callee,
+                callee: callee.clone(),
                 argument: *argument,
             },
             Expression::Nested { outer, left, right } => Task::Nested {
-                outer: *outer,
-                left: *left,
-                right: *right,
+                outer: outer.clone(),
+                left: left.clone(),
+                right: right.clone(),
                 values: Vec::new(),
             },
         };
@@ -431,9 +437,9 @@ impl CheckedClosure for Toy {
                     }
                 }
                 let (callee, arguments) = match values.as_slice() {
-                    [] => (left.0, vec![int(left.1)]),
-                    [_] => (right.0, vec![int(right.1)]),
-                    [l, r] => (*outer, vec![int(*l), int(*r)]),
+                    [] => (left.0.clone(), vec![int(left.1)]),
+                    [_] => (right.0.clone(), vec![int(right.1)]),
+                    [l, r] => (outer.clone(), vec![int(*l), int(*r)]),
                     [.., last] => {
                         return Ok(Transition::Done(Evaluation::completed(int(*last))));
                     }
@@ -447,7 +453,7 @@ impl CheckedClosure for Toy {
             Task::Literal(n) => Ok(Transition::Done(Evaluation::completed(int(*n)))),
             Task::Apply { callee, argument } => {
                 let request = ChildRequest {
-                    callee: *callee,
+                    callee: callee.clone(),
                     arguments: vec![int(*argument)],
                     site: site(),
                 };
@@ -510,7 +516,7 @@ impl BodyFactory for Relay {
     fn begin(&self) -> Box<dyn Body> {
         self.counts.begun.fetch_add(1, Ordering::SeqCst);
         Box::new(RelayBody {
-            target: self.target,
+            target: self.target.clone(),
             finish: self.finish,
             counts: self.counts.clone(),
             saved: None,
@@ -535,7 +541,7 @@ impl Body for RelayBody {
                     self.saved = n.to_u64();
                 }
                 Ok(Transition::Call(ChildRequest {
-                    callee: self.target,
+                    callee: self.target.clone(),
                     arguments: vec![argument],
                     site: site(),
                 }))
@@ -564,7 +570,7 @@ impl BodyFactory for ChargingRelay {
     fn begin(&self) -> Box<dyn Body> {
         self.counts.begun.fetch_add(1, Ordering::SeqCst);
         Box::new(ChargingBody {
-            target: self.target,
+            target: self.target.clone(),
             counts: self.counts.clone(),
             saved: 0,
         })
@@ -602,7 +608,7 @@ impl Body for ChargingBody {
             Resume::Start(arguments) => {
                 self.saved = integers(&arguments).first().copied().unwrap_or_default();
                 Ok(Transition::Call(ChildRequest {
-                    callee: self.target,
+                    callee: self.target.clone(),
                     arguments,
                     site: site(),
                 }))
@@ -630,7 +636,7 @@ pub struct BadRequest {
 impl BodyFactory for BadRequest {
     fn begin(&self) -> Box<dyn Body> {
         Box::new(BadRequestBody {
-            callee: self.callee,
+            callee: self.callee.clone(),
             arguments: self.arguments.clone(),
         })
     }
@@ -644,7 +650,7 @@ struct BadRequestBody {
 impl Body for BadRequestBody {
     fn resume(&mut self, _input: Resume, _meter: &mut Meter) -> Result<Transition, BodyFailure> {
         Ok(Transition::Call(ChildRequest {
-            callee: self.callee,
+            callee: self.callee.clone(),
             arguments: self.arguments.clone(),
             site: site(),
         }))
@@ -660,7 +666,7 @@ pub struct Yielding {
 impl BodyFactory for Yielding {
     fn begin(&self) -> Box<dyn Body> {
         Box::new(YieldingBody {
-            target: self.target,
+            target: self.target.clone(),
             arguments: Vec::new(),
         })
     }
@@ -679,7 +685,7 @@ impl Body for YieldingBody {
                 Ok(Transition::Continue)
             }
             Resume::Again => Ok(Transition::Call(ChildRequest {
-                callee: self.target,
+                callee: self.target.clone(),
                 arguments: self.arguments.clone(),
                 site: site(),
             })),
