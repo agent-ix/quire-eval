@@ -3,19 +3,17 @@
 
 use alloc::string::String;
 
-/// One original declaration key: `{package, node, digest_domain: "sha256-jcs"}`
+/// One original declaration key: the domain `package` and the IR `node`
 /// (`model-complete.md`, "Identity domains";
-/// `model-effective-declaration.schema.json`, `$defs.DeclarationKey`). A
-/// declaration key carries no digest: two versions of one domain package with
-/// equal nodes yield equal declaration keys. It is a plain value and claims
-/// nothing, so its fields are public.
+/// `model-effective-declaration.schema.json`, `$defs.DeclarationKey`). Two
+/// versions of one domain package with equal nodes yield equal declaration
+/// keys. It is a plain value and claims nothing, so its fields are public.
 ///
 /// Ordering matches `model-complete.md`: `package`, then `node`, each as UTF-8
 /// bytes, a proper prefix first. Field declaration order gives exactly that
 /// comparison under `derive(Ord)`.
 ///
-/// The model stage keeps
-/// `declaration_key_wire` for the key's wire view.
+/// The model stage keeps `declaration_key_wire` for the key's wire view.
 ///
 /// quire:canonical
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
