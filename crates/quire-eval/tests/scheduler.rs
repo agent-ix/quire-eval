@@ -565,7 +565,7 @@ fn a_child_refusal_and_a_child_loss_survive_a_direct_return_caller() {
             &mut registry,
             host_a(),
             Relay {
-                target,
+                target: target.clone(),
                 finish,
                 counts: counts.clone(),
             },

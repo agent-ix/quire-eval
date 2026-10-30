@@ -136,7 +136,7 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
         let transition = match &mut frame.engine {
             Engine::Interpreted(task) => {
                 let delivered = match input {
-                    Resume::Child(evaluation) => Some(evaluation),
+                    Resume::Child(evaluation) => Some(*evaluation),
                     Resume::Again => None,
                     Resume::Start(_) => {
                         return Err(fault("interpreted-frame-resumed-with-start").into())
@@ -157,7 +157,7 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
             Transition::Done(evaluation) => {
                 self.frames.pop();
                 match self.frames.last_mut() {
-                    Some(caller) => caller.input = Resume::Child(evaluation),
+                    Some(caller) => caller.input = Resume::Child(Box::new(evaluation)),
                     None => return Ok(Some(evaluation)),
                 }
             }
