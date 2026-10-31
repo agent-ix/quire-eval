@@ -167,7 +167,7 @@ pub enum CallFailure {
     #[error(transparent)]
     Input(#[from] InputRefusal),
     /// A checked-package-specific selection or supply was refused or left
-    /// incomplete before S6a. Its catalog record and node/member/binder locus
+    /// incomplete before S6a. Its population/node/member/binder locus
     /// are preserved separately from function-argument [`Self::Input`] and
     /// checked-body [`Self::Body`] failures. The original QSV input-path
     /// diagnostic is retained with its checked-package locus.
@@ -306,7 +306,11 @@ mod tests {
                 ("population", String::from("customers")),
                 ("field", String::from("address")),
             ]),
-            path: vec![PathStep::Field(String::from("0")), PathStep::Index(2)],
+            path: vec![
+                PathStep::Field(String::from("0")),
+                PathStep::OptionValue,
+                PathStep::Index(2),
+            ],
             kernel: Some(ConstructionCause::TypeMismatch),
         }
     }
