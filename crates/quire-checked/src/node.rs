@@ -601,6 +601,25 @@ pub struct NodeRead<'a, Child> {
     pub location: &'a Location,
 }
 
+impl<'a, Child> NodeRead<'a, Child> {
+    /// Project a stored operation and its checked metadata into a borrowed
+    /// descriptor. `child` supplies handles from the same owning view; the
+    /// caller remains responsible for that ownership guarantee. The result
+    /// is plain data and grants no evaluation authority.
+    pub fn from_stored(
+        operation: &'a NodeKind,
+        value_type: &'a ValueType,
+        location: &'a Location,
+        child: impl FnMut(&'a NodeId) -> Child,
+    ) -> Self {
+        Self {
+            operation: operation.map_ref(child, |literal| &literal.0),
+            value_type,
+            location,
+        }
+    }
+}
+
 impl<Child, Literal> NodeKind<Child, Literal> {
     /// Borrow this operation into the same vocabulary with another child
     /// source and literal representation. Metadata and admitted evidence are

@@ -98,19 +98,18 @@ fn nested_children_and_operand_order_survive_projection() {
 /// Trace: FR-400-AC-11, FR-400-AC-12
 #[test]
 fn borrowed_literal_and_checked_metadata_have_one_read_shape() {
-    let value = Value::Boolean(true);
     let value_type = ValueType::Boolean;
     let location = Location::root(Origin::Expression);
-    let stored = NodeKind::<u8, Value>::Literal(value);
-    let read = NodeRead {
-        operation: stored.map_ref(|_| unreachable!(), |literal| literal),
-        value_type: &value_type,
-        location: &location,
-    };
+    let stored = NodeKind::Literal(CheckedLiteral(Value::Boolean(true)));
+    let read = NodeRead::<usize>::from_stored(&stored, &value_type, &location, |_| unreachable!());
     let NodeKind::Literal(literal) = read.operation else {
         panic!("literal changed operation")
     };
     assert!(matches!(literal, Value::Boolean(true)));
+    let NodeKind::Literal(stored_literal) = &stored else {
+        panic!("stored literal changed operation")
+    };
+    assert!(core::ptr::eq(literal, &stored_literal.0));
     assert!(core::ptr::eq(read.value_type, &value_type));
     assert!(core::ptr::eq(read.location, &location));
 }
