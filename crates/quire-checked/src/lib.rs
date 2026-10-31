@@ -17,6 +17,9 @@ extern crate std;
 
 pub mod integer_division;
 pub mod key;
+pub mod node;
+
+pub use node::{NodeKind, NodeRead};
 
 /// The only constructors of a checked term. Enabled by the checker alone.
 #[cfg(feature = "construct")]
