@@ -35,3 +35,10 @@ Performed a manual acceptance-criteria-to-tests audit of the frozen diff. Quoin'
 
 - FND-001: The tests construct `Record`, `Fold`, `Case`, `Literal`, `Attribute` and `IntegerDivision`. They do not compare stored and borrowed reads for the remaining variants, including `ImportedCall`, `Lookup` and the authored absence mode. They do not invoke an evaluator-path seam probe. A mutation to `map_ref` for any untested arm would leave the suite green.
 - FND-002: `borrowed_literal_and_checked_metadata_have_one_read_shape` asserts successful values and pointer identity only. It cannot fail if an evaluator accepts a constructed descriptor or if checked-term constructor rejection becomes invalid. No new compile-fail fixture tests those conditions.
+
+## Dispositions
+
+| FND | outcome | reason |
+| --- | --- | --- |
+| FND-001 | fixed | node_projection.rs covers all 56 C variants with distinct child ids, checks projection order and round-trip metadata; QSL evaluator-path seam is owned by QSL layers 4/5 and QSL-1375, not this C placement PR. Focused projection tests pass. |
+| FND-002 | deferred | QSL-1375 owns the sealed evaluator and checked-term input integration needed for the AC-12 negative compile proof. This C placement PR has no public evaluator or checked-term type to pass a descriptor to; the incorrect AC-12 trace was removed. The new C doctest compiles/fails as written but its AdmittedIntegerDivision mismatch is not itself the final evaluator-path proof. |

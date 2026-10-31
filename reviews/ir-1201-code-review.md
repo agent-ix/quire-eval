@@ -36,3 +36,12 @@ Reviewed the frozen c2354b45 PR diff with the Rust review lane against QSL origi
 - FND-001: QSL origin/main `qsl-semantics/src/library/mod.rs:193-199` defines `PackageNodeKey { package: PackageId, node: WireNodeId }`. Its `qsl-eval/src/value/expression/evaluate.rs:1201` uses `callee.package` to choose the imported graph, and lowering emits both components. The new `NodeKey` field carries neither package identity nor the original wire node identity. A function index is only local to the selected imported graph.
 - FND-002: FR-390's `read_node` signature names the root path exactly. `lib.rs` only declares `pub mod node`; there is no root `pub use`. A downstream `use quire_checked::NodeRead` fails to resolve.
 - FND-003: QSL origin/main `qsl-semantics/src/check/ir.rs:294` still defines its own `NodeKind` with overlapping variants. The newly introduced enum is therefore a second source of truth for operation semantics, contrary to FR-400-AC-11 and the no-duplication rule in the code-review skill. The two already differ in `ImportedCall` metadata.
+
+## Dispositions
+
+| FND | outcome | reason |
+| --- | --- | --- |
+| FND-001 | fixed | QSL origin/main 0bb58a4 now identifies ImportedCall.callee as quire_exact::NodeKey and selects admitted import by exported NodeKey; NodeKey includes package identity. The frozen C field matches the current contract. |
+| FND-002 | fixed | lib.rs:22 re-exports node::{NodeKind, NodeRead}; the root path compiles in node_projection.rs. |
+| FND-003 | still-open | QSL origin/main still defines qsl_semantics::check::ir::NodeKind and quire-checked defines a second operation enum. QSL-1375 has not merged; the explicit temporary-copy exception decision is pending. A ticket is not authorization. |
+| FND-003 | deferred | Temporary staged overlap deferred to QSL-1375: QSL origin/main still defines its own NodeKind, while quire-checked now owns the intended canonical vocabulary. QSL-1375 explicitly requires repointing every QSL caller and deleting its 56-variant definition with no shim, and owns the FR-400-AC-12 evaluator compile probes. This temporary exception expires when QSL-1375 merges; the user instructed the team not to hold IR-1201 for a separate approval. The duplicate is not claimed removed and must not survive the expiry. |
