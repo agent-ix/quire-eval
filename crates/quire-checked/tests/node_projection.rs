@@ -29,12 +29,12 @@ fn every_operation_projects_all_children_and_retains_metadata() {
     let effective = EffectiveId::new(None, OriginalDeclarationKey::new("fixture", "object"));
     let field = FieldRef::new(effective.clone(), "total");
     let record_field = RecordField::new(key.clone(), "total");
-    let interval = IntegerInterval::spanning(Integer::from(-2), Integer::from(3));
-    let positive = IntegerInterval::spanning(Integer::from(1), Integer::from(3));
+    let interval = IntegerInterval::spanning(Integer::from(-2_i64), Integer::from(3_i64));
+    let positive = IntegerInterval::spanning(Integer::from(1_i64), Integer::from(3_i64));
     let rational = RationalDomain::new(interval.clone(), positive).unwrap();
     let decimal = DecimalType::new(
-        Integer::from(-2),
-        Integer::from(3),
+        Integer::from(-2_i64),
+        Integer::from(3_i64),
         0,
         2,
         RoundingMode::Exact,
@@ -402,4 +402,32 @@ fn root_read_path_is_the_plain_descriptor_type() {
         location: &location,
     };
     accepts_read(&read);
+}
+
+/// Trace: FR-400-AC-11
+#[test]
+fn imported_call_retains_the_structural_package_in_its_callee() {
+    let path = vec![PathSegment::Text("function".into())];
+    let first = NodeKey::new("first-package", path.clone(), 0).unwrap();
+    let second = NodeKey::new("second-package", path, 0).unwrap();
+    assert_ne!(first, second);
+
+    let stored = NodeKind::<usize, ()>::ImportedCall {
+        callee: first.clone(),
+        function: 7,
+        arguments: vec![1, 2],
+    };
+    let read = stored.map_ref(|child| *child + 10, |_| unreachable!());
+    let NodeKind::ImportedCall {
+        callee,
+        function,
+        arguments,
+    } = read
+    else {
+        panic!("imported call changed operation");
+    };
+    assert_eq!(callee, first);
+    assert_ne!(callee, second);
+    assert_eq!(function, 7);
+    assert_eq!(arguments, [11, 12]);
 }
