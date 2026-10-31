@@ -133,30 +133,6 @@ pub enum CallAdmissionFailure {
     Incomplete(CallAdmissionRecord),
 }
 
-/// The result of admitting an observation, retaining its original diagnostic
-/// or invariant fault when no checked authority was admitted (FR-130).
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ObservationAdmission<T> {
-    /// The admitted observation authority.
-    Admitted(T),
-    /// The observation input was refused.
-    Refused(AdmissionRecord),
-    /// Admission lacked evidence needed to decide the observation.
-    Incomplete(AdmissionRecord),
-    /// An admission invariant failed.
-    Fault(InternalFault),
-}
-
-impl<T> ObservationAdmission<T> {
-    /// Return the admitted authority, or the original non-admitted result.
-    pub fn authority(&self) -> Result<&T, &Self> {
-        match self {
-            Self::Admitted(authority) => Ok(authority),
-            Self::Refused(_) | Self::Incomplete(_) | Self::Fault(_) => Err(self),
-        }
-    }
-}
-
 /// The error of an application, preserving ordinary caller-input refusals,
 /// checked-package admission failures, evaluator invariant faults, typed
 /// body-side QSV failures, and failures before or outside an outcome as
@@ -292,6 +268,7 @@ impl Evaluation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ObservationAdmission;
     use alloc::collections::BTreeMap;
     use alloc::string::String;
     use alloc::vec;
