@@ -50,7 +50,7 @@ pub use integer::modulo;
 pub use registry::{Admission, Registry};
 pub use result::{
     CallAdmissionFailure, CallAdmissionLocus, CallAdmissionRecord, CallFailure, EvalOutcome,
-    Evaluation, FamilyOutcome, FamilyResult,
+    Evaluation, FamilyOutcome, FamilyResult, ObservationAdmission,
 };
 pub use session::{Progress, Session};
 pub use signature::Signature;

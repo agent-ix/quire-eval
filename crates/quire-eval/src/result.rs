@@ -8,10 +8,9 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use quire_exact::{CancelCause, NodeKey, Outcome, Value};
+use quire_semantic_value::admission::AdmissionRecord;
 use quire_semantic_value::call::InputRefusal;
-use quire_semantic_value::catalog::{
-    CatalogCode, CatalogCoded, Category, InternalFault, UndefinedCoded,
-};
+use quire_semantic_value::catalog::{CatalogCoded, Category, InternalFault, UndefinedCoded};
 use quire_semantic_value::declaration::EnvironmentFailure;
 use quire_semantic_value::location::Location;
 use quire_semantic_value::loss::LocatedLoss;
@@ -97,6 +96,8 @@ pub struct Evaluation {
 pub enum CallAdmissionLocus {
     /// The selected checked node.
     Node(NodeKey),
+    /// The population node whose input admission observed the defect.
+    Population(NodeKey),
     /// A member of the selected node, optionally at one list index.
     Member {
         /// The member name.
@@ -108,12 +109,14 @@ pub enum CallAdmissionLocus {
     Binder(NodeKey),
 }
 
-/// The catalog code, cause and checked-package locus of a call admission
-/// failure. Admission failures occur before S6a and do not charge the meter.
+/// The original input-path diagnostic and checked-package locus of a call
+/// admission failure. Admission failures occur before S6a and do not charge
+/// the meter.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CallAdmissionRecord {
-    /// The catalog code and cause pair.
-    pub code: CatalogCode,
+    /// The shared diagnostic, including catalog pair, named fields, path and
+    /// kernel construction cause.
+    pub record: AdmissionRecord,
     /// The checked-package input that admission names.
     pub locus: CallAdmissionLocus,
 }
@@ -130,6 +133,30 @@ pub enum CallAdmissionFailure {
     Incomplete(CallAdmissionRecord),
 }
 
+/// The result of admitting an observation, retaining its original diagnostic
+/// or invariant fault when no checked authority was admitted (FR-130).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ObservationAdmission<T> {
+    /// The admitted observation authority.
+    Admitted(T),
+    /// The observation input was refused.
+    Refused(AdmissionRecord),
+    /// Admission lacked evidence needed to decide the observation.
+    Incomplete(AdmissionRecord),
+    /// An admission invariant failed.
+    Fault(InternalFault),
+}
+
+impl<T> ObservationAdmission<T> {
+    /// Return the admitted authority, or the original non-admitted result.
+    pub fn authority(&self) -> Result<&T, &Self> {
+        match self {
+            Self::Admitted(authority) => Ok(authority),
+            Self::Refused(_) | Self::Incomplete(_) | Self::Fault(_) => Err(self),
+        }
+    }
+}
+
 /// The error of an application, preserving ordinary caller-input refusals,
 /// checked-package admission failures, evaluator invariant faults, typed
 /// body-side QSV failures, and failures before or outside an outcome as
@@ -140,9 +167,10 @@ pub enum CallFailure {
     #[error(transparent)]
     Input(#[from] InputRefusal),
     /// A checked-package-specific selection or supply was refused or left
-    /// incomplete before S6a. Its catalog record and node/member/binder locus
+    /// incomplete before S6a. Its population/node/member/binder locus
     /// are preserved separately from function-argument [`Self::Input`] and
-    /// checked-body [`Self::Body`] failures.
+    /// checked-body [`Self::Body`] failures. The original QSV input-path
+    /// diagnostic is retained with its checked-package locus.
     #[error(transparent)]
     Admission(Box<CallAdmissionFailure>),
     /// An S6a invariant broke (ADR-013 T-4): never a caller-input refusal,
@@ -264,34 +292,56 @@ impl Evaluation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::collections::BTreeMap;
     use alloc::string::String;
+    use alloc::vec;
+    use quire_exact::{ConstructionCause, PathSegment};
+    use quire_semantic_value::admission::PathStep;
     use quire_semantic_value::catalog::CatalogCode;
 
-    /// Admission refusals remain distinct from ordinary argument and body failures,
-    /// and preserve their catalog pair and member locus.
+    fn diagnostic() -> AdmissionRecord {
+        AdmissionRecord {
+            catalog: CatalogCode::new("invalid_runtime_input", "invalid-value"),
+            fields: BTreeMap::from([
+                ("population", String::from("customers")),
+                ("field", String::from("address")),
+            ]),
+            path: vec![
+                PathStep::Field(String::from("0")),
+                PathStep::OptionValue,
+                PathStep::Index(2),
+            ],
+            kernel: Some(ConstructionCause::TypeMismatch),
+        }
+    }
+
+    /// Trace: FR-130-AC-3.
+    /// Admission refusals retain the original input path at a population locus.
     #[test]
-    fn admission_refusal_preserves_catalog_and_member_locus() {
+    fn admission_refusal_preserves_population_locus_and_diagnostic() {
+        let population = NodeKey::new(
+            "test",
+            vec![PathSegment::Text(String::from("population"))],
+            7,
+        )
+        .expect("valid test key");
+        let diagnostic = diagnostic();
         let failure = CallFailure::Admission(Box::new(CallAdmissionFailure::Refused(
             CallAdmissionRecord {
-                code: CatalogCode::new("invalid_runtime_input", "malformed-declaration"),
-                locus: CallAdmissionLocus::Member {
-                    name: String::from("condition"),
-                    index: None,
-                },
+                record: diagnostic.clone(),
+                locus: CallAdmissionLocus::Population(population.clone()),
             },
         )));
 
         assert_eq!(failure.category(), Category::Refusal);
-        assert!(matches!(
-            &failure,
-            CallFailure::Admission(payload)
-                if matches!(payload.as_ref(), CallAdmissionFailure::Refused(record)
-                    if record.code == CatalogCode::new("invalid_runtime_input", "malformed-declaration")
-                        && record.locus == CallAdmissionLocus::Member {
-                            name: String::from("condition"),
-                            index: None,
-                        })
-        ));
+        let CallFailure::Admission(payload) = &failure else {
+            panic!("expected a package admission failure");
+        };
+        let CallAdmissionFailure::Refused(record) = payload.as_ref() else {
+            panic!("expected a refusal");
+        };
+        assert_eq!(record.locus, CallAdmissionLocus::Population(population));
+        assert_eq!(record.record, diagnostic);
         assert_ne!(
             failure,
             CallFailure::Input(InputRefusal::WrongValueKind { parameter: 0 })
@@ -304,7 +354,15 @@ mod tests {
     fn incomplete_admission_preserves_member_index_locus() {
         let failure = CallFailure::Admission(Box::new(CallAdmissionFailure::Incomplete(
             CallAdmissionRecord {
-                code: CatalogCode::new("unavailable_observation", "missing-required-artifact"),
+                record: AdmissionRecord {
+                    catalog: CatalogCode::new(
+                        "unavailable_observation",
+                        "missing-required-artifact",
+                    ),
+                    fields: BTreeMap::new(),
+                    path: Vec::new(),
+                    kernel: None,
+                },
                 locus: CallAdmissionLocus::Member {
                     name: String::from("captures"),
                     index: Some(2),
@@ -317,7 +375,7 @@ mod tests {
             &failure,
             CallFailure::Admission(payload)
                 if matches!(payload.as_ref(), CallAdmissionFailure::Incomplete(record)
-                    if record.code == CatalogCode::new(
+                    if record.record.catalog == CatalogCode::new(
                         "unavailable_observation",
                         "missing-required-artifact",
                     ) && record.locus == CallAdmissionLocus::Member {
@@ -328,6 +386,30 @@ mod tests {
         assert_ne!(
             failure,
             CallFailure::Fault(InternalFault::new("S6a", "bad-input"))
+        );
+    }
+
+    /// Trace: FR-130-AC-4.
+    /// Every observation result keeps its own kind and original payload.
+    #[test]
+    fn observation_authority_query_preserves_all_failure_kinds() {
+        let diagnostic = diagnostic();
+        let admitted = ObservationAdmission::Admitted(17_u8);
+        assert_eq!(admitted.authority(), Ok(&17));
+
+        let refused: ObservationAdmission<u8> = ObservationAdmission::Refused(diagnostic.clone());
+        assert!(
+            matches!(refused.authority(), Err(ObservationAdmission::Refused(record)) if record == &diagnostic)
+        );
+        let incomplete: ObservationAdmission<u8> =
+            ObservationAdmission::Incomplete(diagnostic.clone());
+        assert!(
+            matches!(incomplete.authority(), Err(ObservationAdmission::Incomplete(record)) if record == &diagnostic)
+        );
+        let fault = InternalFault::new("admission", "missing-observation-authority");
+        let failed: ObservationAdmission<u8> = ObservationAdmission::Fault(fault.clone());
+        assert!(
+            matches!(failed.authority(), Err(ObservationAdmission::Fault(actual)) if actual == &fault)
         );
     }
 }
