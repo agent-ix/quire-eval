@@ -163,7 +163,7 @@ dependencies = [
 [[package]]
 name = "quire-exact"
 version = "0.1.0"
-source = "git+https://github.com/agent-ix/quire-exact?branch=main#eea6b1220c47494ac338434e2d213d41a2aceb16"
+source = "git+https://github.com/agent-ix/quire-exact?branch=main#82e8f9b4d9583ba4eee505550ff80a211333696f"
 dependencies = [
  "allocator-api2",
  "num-bigint",
@@ -179,7 +179,7 @@ dependencies = [
 [[package]]
 name = "quire-semantic-value"
 version = "0.1.0"
-source = "git+https://github.com/agent-ix/quire-semantic-value?branch=main#74ab6f8a772de060c485bc75fd97219d1d6a9de0"
+source = "git+https://github.com/agent-ix/quire-semantic-value?branch=main#ae6f6f312fc5a9a91ebfd61e235b3967557c7504"
 dependencies = [
  "quire-canonical",
  "quire-exact",
