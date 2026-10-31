@@ -17,6 +17,7 @@ extern crate std;
 
 pub mod integer_division;
 pub mod key;
+pub mod node;
 
 /// The only constructors of a checked term. Enabled by the checker alone.
 #[cfg(feature = "construct")]
