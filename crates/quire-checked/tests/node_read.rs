@@ -96,7 +96,7 @@ fn nested_children_and_operand_order_survive_projection() {
     assert_eq!(arms[0].body, 14);
 }
 
-/// Trace: FR-400-AC-11, FR-400-AC-12
+/// Trace: FR-400-AC-11
 #[test]
 fn borrowed_literal_and_checked_metadata_have_one_read_shape() {
     let value_type = ValueType::Boolean;

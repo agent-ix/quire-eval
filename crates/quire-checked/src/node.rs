@@ -604,7 +604,7 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
 /// }
 /// ```
 ///
-/// The descriptor cannot be used as a checked term:
+/// FR-400-AC-12: the descriptor cannot be used as a checked term:
 ///
 /// ```compile_fail,E0308
 /// use quire_checked::{NodeKind, NodeRead};

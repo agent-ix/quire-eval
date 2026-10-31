@@ -387,7 +387,7 @@ fn every_operation_projects_all_children_and_retains_metadata() {
     }
 }
 
-/// Trace: FR-400-AC-11, FR-400-AC-12
+/// Trace: FR-400-AC-11
 #[test]
 fn root_read_path_is_the_plain_descriptor_type() {
     fn accepts_read(_: &NodeRead<'_, usize>) {}
