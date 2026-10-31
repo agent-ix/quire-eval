@@ -10,9 +10,7 @@ use alloc::vec::Vec;
 use quire_exact::{CancelCause, NodeKey, Outcome, Value};
 use quire_semantic_value::admission::AdmissionRecord;
 use quire_semantic_value::call::InputRefusal;
-use quire_semantic_value::catalog::{
-    CatalogCoded, Category, InternalFault, UndefinedCoded,
-};
+use quire_semantic_value::catalog::{CatalogCoded, Category, InternalFault, UndefinedCoded};
 use quire_semantic_value::declaration::EnvironmentFailure;
 use quire_semantic_value::location::Location;
 use quire_semantic_value::loss::LocatedLoss;
@@ -348,7 +346,10 @@ mod tests {
         let failure = CallFailure::Admission(Box::new(CallAdmissionFailure::Incomplete(
             CallAdmissionRecord {
                 record: AdmissionRecord {
-                    catalog: CatalogCode::new("unavailable_observation", "missing-required-artifact"),
+                    catalog: CatalogCode::new(
+                        "unavailable_observation",
+                        "missing-required-artifact",
+                    ),
                     fields: BTreeMap::new(),
                     path: Vec::new(),
                     kernel: None,
@@ -388,11 +389,18 @@ mod tests {
         assert_eq!(admitted.authority(), Ok(&17));
 
         let refused: ObservationAdmission<u8> = ObservationAdmission::Refused(diagnostic.clone());
-        assert!(matches!(refused.authority(), Err(ObservationAdmission::Refused(record)) if record == &diagnostic));
-        let incomplete: ObservationAdmission<u8> = ObservationAdmission::Incomplete(diagnostic.clone());
-        assert!(matches!(incomplete.authority(), Err(ObservationAdmission::Incomplete(record)) if record == &diagnostic));
+        assert!(
+            matches!(refused.authority(), Err(ObservationAdmission::Refused(record)) if record == &diagnostic)
+        );
+        let incomplete: ObservationAdmission<u8> =
+            ObservationAdmission::Incomplete(diagnostic.clone());
+        assert!(
+            matches!(incomplete.authority(), Err(ObservationAdmission::Incomplete(record)) if record == &diagnostic)
+        );
         let fault = InternalFault::new("admission", "missing-observation-authority");
         let failed: ObservationAdmission<u8> = ObservationAdmission::Fault(fault.clone());
-        assert!(matches!(failed.authority(), Err(ObservationAdmission::Fault(actual)) if actual == &fault));
+        assert!(
+            matches!(failed.authority(), Err(ObservationAdmission::Fault(actual)) if actual == &fault)
+        );
     }
 }
