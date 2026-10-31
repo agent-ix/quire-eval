@@ -6,6 +6,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
+use core::fmt;
 
 use quire_exact::{
     ArithmeticOperator, CollectionType, DecimalType, EffectiveId, FieldValue, IntegerInterval,
@@ -24,13 +25,19 @@ use crate::key::DeclarationKey;
 pub type Slot = usize;
 
 /// An arena index naming a node in its owning checked body.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct NodeId(usize);
 
 impl NodeId {
     /// The position of this node in its body.
     pub fn index(self) -> usize {
         self.0
+    }
+}
+
+impl fmt::Debug for NodeId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "#{}", self.0)
     }
 }
 
