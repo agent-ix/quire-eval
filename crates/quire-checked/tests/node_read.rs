@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! FR-400 canonical operation projection tests.
 
-use quire_checked::node::{CaseArm, NodeKind, NodeRead, RecordSlot};
+use quire_checked::node::{CaseArm, CheckedLiteral, NodeKind, NodeRead, RecordSlot};
 use quire_exact::{Value, ValueType};
 use quire_semantic_value::location::{Location, Origin};
 
@@ -147,4 +147,17 @@ fn explicit_dereference_charge_flag_survives_projection() {
         assert!(!optional);
         assert_eq!(observed_flag, derefed);
     }
+}
+
+/// Trace: FR-400-AC-11
+#[test]
+fn checked_literal_preserves_non_keyed_float_identity() {
+    let one = CheckedLiteral(Value::Float(quire_exact::IeeeValue::binary64(
+        0x7ff8_0000_0000_0001,
+    )));
+    let other = CheckedLiteral(Value::Float(quire_exact::IeeeValue::binary64(
+        0x7ff8_0000_0000_0002,
+    )));
+    assert_eq!(one, one.clone());
+    assert_ne!(one, other);
 }

@@ -64,42 +64,59 @@ impl RecordField {
 /// A connective with a skippable right operand.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Connective {
+    /// Logical conjunction.
     And,
+    /// Logical disjunction.
     Or,
+    /// Logical implication.
     Implies,
 }
 
 /// Integer addition, subtraction or multiplication.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Arithmetic {
+    /// Addition.
     Add,
+    /// Subtraction.
     Subtract,
+    /// Multiplication.
     Multiply,
 }
 
 /// An integer division operator.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IntegerDivisionOperator {
+    /// Quotient under the admitted law.
     Div,
+    /// Remainder under the admitted law.
     Rem,
+    /// Euclidean remainder independent of that law.
     Mod,
 }
 
 /// The value domain of an ordering comparison.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OrderedKind {
+    /// Integer values.
     Integers,
+    /// Rational values.
     Rationals,
+    /// Decimal values.
     Decimals,
+    /// Ordered enum members.
     Enums,
+    /// Profile-ordered text.
     Texts,
+    /// Equal-unit quantities.
     Quantities,
 }
 
 /// The near end of a relationship.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum EndSide {
+    /// Source end.
     Source,
+    /// Target end.
     Target,
 }
 
@@ -186,12 +203,19 @@ pub struct CaseArm<Child = NodeId> {
 /// A one-binder collection query.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Visit {
+    /// Map each occurrence.
     Map,
+    /// Keep admitted occurrences.
     Filter,
+    /// Test that every occurrence is admitted.
     Forall,
+    /// Test that some occurrence is admitted.
     Exists,
+    /// Count admitted occurrences.
     Count,
+    /// Sum integer results.
     Sum,
+    /// Read the sole occurrence.
     Only,
 }
 
@@ -209,47 +233,68 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     Local(Slot),
     /// Bind a value and evaluate a body.
     Let {
+        /// The local slot.
         slot: Slot,
+        /// The bound value operand.
         value: Child,
+        /// The body operand.
         body: Child,
     },
     /// Choose a branch by a Boolean condition.
     If {
+        /// The Boolean condition operand.
         condition: Child,
+        /// The true branch.
         then: Child,
+        /// The false branch.
         otherwise: Child,
     },
     /// Integer arithmetic.
     Arithmetic(Arithmetic, Child, Child),
     /// Integer division with its admitted law, absent only for modulus.
     IntegerDivision {
+        /// The selected operator.
         operator: IntegerDivisionOperator,
+        /// The admitted division law, when required.
         selection: Option<AdmittedIntegerDivision>,
+        /// The left operand.
         left: Child,
+        /// The right operand.
         right: Child,
     },
     /// Unary integer negation.
     Negate(Child),
     /// Integer division producing a rational.
     Divide {
+        /// The left operand.
         left: Child,
+        /// The right operand.
         right: Child,
+        /// The result domain.
         domain: RationalDomain,
     },
     /// Rational arithmetic.
     Rational {
+        /// The selected operator.
         operator: ArithmeticOperator,
+        /// The left operand.
         left: Child,
+        /// The right operand.
         right: Child,
+        /// The result domain.
         domain: RationalDomain,
     },
     /// Unary rational negation.
     RationalNegate(Child, RationalDomain),
     /// Decimal arithmetic.
     Decimal {
+        /// The selected operator.
         operator: ArithmeticOperator,
+        /// The left operand.
         left: Child,
+        /// The right operand.
         right: Child,
+        /// The target type or operand.
         target: DecimalType,
     },
     /// Unary decimal negation.
@@ -279,37 +324,55 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     Not(Child),
     /// Read a record field.
     Field {
+        /// The operand.
         operand: Child,
+        /// The field identity or name.
         field: RecordField,
+        /// Whether the field is optional.
         optional: bool,
     },
     /// Read a model attribute; `derefed` preserves its explicit-dereference charge.
     Attribute {
+        /// The reference operand.
         reference: Child,
+        /// The field identity or name.
         field: FieldRef,
+        /// Whether the field is optional.
         optional: bool,
+        /// Whether an explicit dereference is charged.
         derefed: bool,
     },
     /// Navigate a relationship end.
     Navigate {
+        /// The reference operand.
         reference: Child,
+        /// The relationship identity.
         relationship: DeclarationKey,
+        /// The named relationship role.
         role: String,
+        /// The end nearest the source reference.
         near: EndSide,
+        /// Whether the destination end is unique.
         unique: bool,
     },
     /// Test optional presence.
     Present(Child),
     /// Test presence of a guarded clock place.
     PlacePresence {
+        /// The reference operand.
         reference: Child,
+        /// The field identity or name.
         field: FieldRef,
+        /// The selected union case, if any.
         case: Option<String>,
     },
     /// Test presence of clock collection slots.
     SlotPresence {
+        /// The reference operand.
         reference: Child,
+        /// The field identity or name.
         field: FieldRef,
+        /// Whether every element must be present.
         all: bool,
     },
     /// Extract an optional payload.
@@ -318,33 +381,46 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     OptionSome(Child),
     /// Call a local function.
     Call {
+        /// The checked function index.
         function: usize,
+        /// The argument operands in order.
         arguments: Vec<Child>,
     },
     /// Call an admitted dependency function.
     ImportedCall {
+        /// The admitted dependency callee identity.
         callee: NodeKey,
+        /// The checked function index.
         function: usize,
+        /// The argument operands in order.
         arguments: Vec<Child>,
     },
     /// Construct a tuple.
     Tuple {
+        /// The declared type identity.
         declaration: NodeKey,
+        /// The argument operands in order.
         arguments: Vec<Child>,
     },
     /// Construct a record.
     Record {
+        /// The declared type identity.
         declaration: NodeKey,
+        /// The record fields in declaration order.
         slots: Vec<RecordSlot<Child>>,
     },
     /// Construct a collection.
     Collection {
+        /// The collection type.
         collection_type: CollectionType,
+        /// The element operands in source order.
         elements: Vec<Child>,
     },
     /// Convert a collection kind.
     ConvertCollection {
+        /// The target type or operand.
         target: CollectionType,
+        /// The operand.
         operand: Child,
     },
     /// Convert an equality operand's scalar.
@@ -353,19 +429,28 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     IeeeToRational(Child, RationalDomain),
     /// Run a one-binder query.
     Query {
+        /// The query operation.
         visit: Visit,
+        /// The local slot.
         slot: Slot,
+        /// The source operand.
         source: Child,
+        /// The body operand.
         body: Child,
     },
     /// Flatten a collection.
     Flatten(Child),
     /// Fold or reduce a collection.
     Fold {
+        /// The accumulator slot.
         accumulator: Slot,
+        /// The occurrence binder slot.
         binder: Slot,
+        /// The source operand.
         source: Child,
+        /// The fold step operand.
         step: Child,
+        /// The fold identity, absent for reduce.
         identity: Option<Child>,
     },
     /// Read collection size.
@@ -373,69 +458,109 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     /// Test collection membership.
     Contains(Child, Child),
     /// Read all instances of a population.
-    AllInstances { population: Child },
+    AllInstances {
+        /// The population operand, bound, or identity.
+        population: Child,
+    },
     /// Look up a reference in a population.
     Lookup {
+        /// The population operand, bound, or identity.
         population: Child,
+        /// The reference operand.
         reference: Child,
+        /// The authored absence mode.
         absence: AbsenceMode,
     },
     /// Dispatch an operation by receiver type.
     Dispatch {
+        /// The receiver operand.
         receiver: Child,
+        /// The dispatch table index.
         table: usize,
+        /// The dispatch operation index.
         operation: usize,
+        /// The argument operands in order.
         arguments: Vec<Child>,
     },
     /// Evaluate against the invocation pre population.
     Pre(Child),
     /// Test reachability through an object field.
     Reaches {
+        /// The source operand.
         source: Child,
+        /// The target type or operand.
         target: Child,
+        /// The traversed edge field.
         edge: FieldRef,
     },
     /// Test reachability through a relationship end.
     ReachesEnd {
+        /// The source operand.
         source: Child,
+        /// The target type or operand.
         target: Child,
+        /// The relationship identity.
         relationship: DeclarationKey,
+        /// The named relationship role.
         role: String,
+        /// The end nearest the source reference.
         near: EndSide,
+        /// The population operand, bound, or identity.
         population: Option<AuthoredBound>,
     },
     /// Read a protocol declaration.
-    ProtocolReference { protocol: usize },
+    ProtocolReference {
+        /// The protocol declaration index.
+        protocol: usize,
+    },
     /// Select a union case arm.
     Case {
+        /// The union value being selected.
         scrutinee: Child,
+        /// The declared type identity.
         declaration: NodeKey,
+        /// The case arms in member order.
         arms: Vec<CaseArm<Child>>,
     },
     /// Construct a union member.
     UnionValue {
+        /// The declared type identity.
         declaration: NodeKey,
+        /// The selected union member index.
         member: usize,
+        /// The argument operands in order.
         arguments: Vec<Child>,
     },
     /// Read concrete population objects.
-    PopulationObjects { population: DeclarationKey },
+    PopulationObjects {
+        /// The population operand, bound, or identity.
+        population: DeclarationKey,
+    },
     /// Name a domain-package population.
     NamedPopulation {
+        /// The population operand, bound, or identity.
         population: DeclarationKey,
+        /// The declared member types.
         members: Vec<EffectiveId>,
     },
     /// Read a refinement history field.
     History {
+        /// The reference operand.
         reference: Child,
+        /// The concrete object type.
         object_type: EffectiveId,
+        /// The field identity or name.
         field: String,
     },
     /// Build an integer sequence.
     Seq {
+        /// The local slot.
         slot: Slot,
+        /// The first bound operand.
         low: Child,
+        /// The last bound operand.
         high: Child,
+        /// The body operand.
         body: Child,
     },
     /// Probe-only variant that forces consumers to handle new operations.
@@ -460,10 +585,10 @@ impl<Child, Literal> NodeKind<Child, Literal> {
     /// Borrow this operation into the same vocabulary with another child
     /// source and literal representation. Metadata and admitted evidence are
     /// retained; every child, including nested slots and arms, is mapped.
-    pub fn map_ref<MappedChild, MappedLiteral>(
-        &self,
-        mut child: impl FnMut(&Child) -> MappedChild,
-        literal: impl FnOnce(&Literal) -> MappedLiteral,
+    pub fn map_ref<'a, MappedChild, MappedLiteral>(
+        &'a self,
+        mut child: impl FnMut(&'a Child) -> MappedChild,
+        literal: impl FnOnce(&'a Literal) -> MappedLiteral,
     ) -> NodeKind<MappedChild, MappedLiteral> {
         use NodeKind as K;
         match self {
