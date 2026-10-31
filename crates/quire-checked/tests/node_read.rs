@@ -161,3 +161,33 @@ fn checked_literal_preserves_non_keyed_float_identity() {
     assert_eq!(one, one.clone());
     assert_ne!(one, other);
 }
+
+/// Trace: FR-400-AC-11
+#[cfg(feature = "construct")]
+#[test]
+fn admitted_division_selection_survives_projection() {
+    let selection =
+        quire_checked::construct::admitted_integer_division(quire_exact::DivisionProfile::Floor);
+    let stored = NodeKind::<u8, ()>::IntegerDivision {
+        operator: quire_checked::node::IntegerDivisionOperator::Rem,
+        selection: Some(selection),
+        left: 1,
+        right: 2,
+    };
+    let projected = stored.map_ref(|child| usize::from(*child) + 10, |_| unreachable!());
+    let NodeKind::IntegerDivision {
+        operator,
+        selection,
+        left,
+        right,
+    } = projected
+    else {
+        panic!("division changed operation")
+    };
+    assert_eq!(operator, quire_checked::node::IntegerDivisionOperator::Rem);
+    assert_eq!(
+        selection.unwrap().profile(),
+        quire_exact::DivisionProfile::Floor
+    );
+    assert_eq!((left, right), (11, 12));
+}

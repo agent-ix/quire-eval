@@ -140,19 +140,30 @@ impl PartialEq for CheckedLiteral {
         let mut pending = alloc::vec![(&self.0, &other.0)];
         while let Some((left, right)) = pending.pop() {
             match (left, right) {
-                (Value::Float(a), Value::Float(b))
-                    if a.width() == b.width() && a.bits() == b.bits() => {}
-                (Value::Population(a), Value::Population(b)) if a == b => {}
-                (Value::Option(a), Value::Option(b)) if a.payload_type() == b.payload_type() => {
+                (Value::Float(a), Value::Float(b)) => {
+                    if a.width() != b.width() || a.bits() != b.bits() {
+                        return false;
+                    }
+                }
+                (Value::Population(a), Value::Population(b)) => {
+                    if a != b {
+                        return false;
+                    }
+                }
+                (Value::Option(a), Value::Option(b)) => {
+                    if a.payload_type() != b.payload_type() {
+                        return false;
+                    }
                     match (a.payload(), b.payload()) {
                         (None, None) => {}
                         (Some(a), Some(b)) => pending.push((a, b)),
                         _ => return false,
                     }
                 }
-                (Value::Composite(a), Value::Composite(b))
-                    if a.declaration() == b.declaration() && a.slots().len() == b.slots().len() =>
-                {
+                (Value::Composite(a), Value::Composite(b)) => {
+                    if a.declaration() != b.declaration() || a.slots().len() != b.slots().len() {
+                        return false;
+                    }
                     for (a, b) in a.slots().iter().zip(b.slots()) {
                         match (a, b) {
                             (FieldValue::Present(a), FieldValue::Present(b)) => {
@@ -164,10 +175,12 @@ impl PartialEq for CheckedLiteral {
                         }
                     }
                 }
-                (Value::Collection(a), Value::Collection(b))
-                    if a.collection_type() == b.collection_type()
-                        && a.elements().len() == b.elements().len() =>
-                {
+                (Value::Collection(a), Value::Collection(b)) => {
+                    if a.collection_type() != b.collection_type()
+                        || a.elements().len() != b.elements().len()
+                    {
+                        return false;
+                    }
                     pending.extend(a.elements().iter().zip(b.elements()));
                 }
                 (a, b) if quire_exact::compare_keys(a, b) == Some(Ordering::Equal) => {}
