@@ -295,7 +295,7 @@ mod tests {
     use alloc::collections::BTreeMap;
     use alloc::string::String;
     use alloc::vec;
-    use quire_exact::ConstructionCause;
+    use quire_exact::{ConstructionCause, PathSegment};
     use quire_semantic_value::admission::PathStep;
     use quire_semantic_value::catalog::CatalogCode;
 
@@ -315,7 +315,12 @@ mod tests {
     /// Admission refusals retain the original input path at a population locus.
     #[test]
     fn admission_refusal_preserves_population_locus_and_diagnostic() {
-        let population = NodeKey::new("test", Vec::new(), 7).expect("valid test key");
+        let population = NodeKey::new(
+            "test",
+            vec![PathSegment::Text(String::from("population"))],
+            7,
+        )
+        .expect("valid test key");
         let diagnostic = diagnostic();
         let failure = CallFailure::Admission(Box::new(CallAdmissionFailure::Refused(
             CallAdmissionRecord {
