@@ -268,13 +268,13 @@ impl Evaluation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ObservationAdmission;
     use alloc::collections::BTreeMap;
     use alloc::string::String;
     use alloc::vec;
     use quire_exact::{ConstructionCause, PathSegment};
     use quire_semantic_value::admission::PathStep;
     use quire_semantic_value::catalog::CatalogCode;
-    use crate::ObservationAdmission;
 
     fn diagnostic() -> AdmissionRecord {
         AdmissionRecord {
