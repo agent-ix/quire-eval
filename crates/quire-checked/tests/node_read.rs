@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! FR-400 canonical operation projection tests.
 
-use quire_checked::node::{CaseArm, CheckedLiteral, NodeKind, NodeRead, RecordSlot};
+use quire_checked::node::{CaseArm, CheckedLiteral, RecordSlot};
+use quire_checked::{NodeKind, NodeRead};
 use quire_exact::{Value, ValueType};
 use quire_semantic_value::location::{Location, Origin};
 

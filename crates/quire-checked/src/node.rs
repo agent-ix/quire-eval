@@ -591,6 +591,34 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
 /// A borrowed node read from an admitted, owner-qualified source.
 ///
 /// This descriptor alone carries no admission authority.
+/// Constructing one from plain values is allowed:
+///
+/// ```no_run
+/// use quire_checked::{NodeKind, NodeRead};
+/// use quire_exact::{Value, ValueType};
+/// use quire_semantic_value::location::Location;
+/// fn describe<'a>(value: &'a Value, value_type: &'a ValueType, location: &'a Location)
+///     -> NodeRead<'a, usize>
+/// {
+///     NodeRead { operation: NodeKind::Literal(value), value_type, location }
+/// }
+/// ```
+///
+/// The descriptor cannot be used as a checked term:
+///
+/// ```compile_fail,E0308
+/// use quire_checked::{NodeKind, NodeRead};
+/// use quire_checked::integer_division::AdmittedIntegerDivision;
+/// use quire_exact::{Value, ValueType};
+/// use quire_semantic_value::location::Location;
+/// fn admitted_only(_: &AdmittedIntegerDivision) {}
+/// fn attempt(value: &Value, value_type: &ValueType, location: &Location) {
+///     let read: NodeRead<'_, usize> = NodeRead {
+///         operation: NodeKind::Literal(value), value_type, location,
+///     };
+///     admitted_only(&read);
+/// }
+/// ```
 #[derive(Clone, Debug)]
 pub struct NodeRead<'a, Child> {
     /// The canonical operation, with owner-qualified child handles.
