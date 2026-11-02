@@ -28,7 +28,10 @@ the admitted operands. This requirement is **planned until IR-1259 lands**.
 The `NodeKind` vocabulary SHALL distinguish these four identities from each
 other and from existing IEEE arithmetic, square root, numeric equality, and
 ordinary ordering nodes. Its `OrderedKind` vocabulary SHALL include `Float`
-as an explicit float ordering domain. A borrowed node read SHALL preserve the
+as the domain tag of the distinct `quire.op.ieee.total_order` checked read.
+An admitted IEEE total-order operation SHALL NOT use ordinary
+`NodeKind::Order`, and IEEE values remain ineligible for ordinary ordering.
+A borrowed node read SHALL preserve the
 same identity, width where applicable, rounding mode where applicable, and
 operand order as its stored checked node. This requirement defines a typed
 representation; it does not define a second evaluator or a local operation
@@ -42,7 +45,7 @@ catalogue.
 | FR-001-AC-2 | A checked `quire.op.ieee.float64.fma` node projects as a typed float64 fused multiply-add read with its admitted rounding mode and three operands in source order; the read remains distinguishable from float32. | Test |
 | FR-001-AC-3 | A checked `quire.op.ieee.total_order` node projects as a typed two-operand total-order read, distinct from ordinary ordering and numeric equality. | Test |
 | FR-001-AC-4 | A checked `quire.op.ieee.bit_identical` node projects as a typed two-operand bit-identity read, distinct from total order and numeric equality. | Test |
-| FR-001-AC-5 | `OrderedKind::Float` is available as a distinct ordered domain and survives a borrowed projection when a checked node carries float ordering-domain metadata. | Test |
+| FR-001-AC-5 | An admitted `quire.op.ieee.total_order` node carries `OrderedKind::Float` through its typed borrowed read, while its identity remains distinct from ordinary `NodeKind::Order`; no IEEE catalogue identity is represented as ordinary `NodeKind::Order`. | Test |
 | FR-001-AC-6 | Each identity in the table has a corresponding checked-node representation whose typed read retains that identity without a local identity alias or copied catalogue. | Inspection |
 
 ## Dependencies
