@@ -32,8 +32,11 @@ reinterpreting its wire form.
 The current requirement inventory covers the IEEE checked-node vocabulary in
 [FR-001](functional/FR-001-ieee-checked-node-vocabulary.md), derived from
 [US-001](usecase/US-001-inspect-ieee-checked-nodes.md). FR-001 is implemented by
-the checked-node descriptors and borrowed projections. Other existing crate
-behavior is outside this initial inventory and is not assigned a new requirement
+the checked-node descriptors and borrowed projections. The connective origin
+carried on checked connective nodes is specified in
+[FR-002](functional/FR-002-checked-connective-origin.md), derived from
+[US-002](usecase/US-002-distinguish-authored-connectives.md). Other existing
+crate behavior is outside this initial inventory and is not assigned a new requirement
 by this change.
 
 The IEEE arithmetic, comparison, rounding, and diagnostic semantics remain

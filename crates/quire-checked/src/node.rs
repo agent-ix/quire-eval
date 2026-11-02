@@ -79,6 +79,22 @@ pub enum Connective {
     Implies,
 }
 
+/// Whether a connective node was written in the source or introduced by the
+/// checker.
+///
+/// A consumer that records decisions only for connectives the author wrote
+/// reads this instead of inferring origin from locations. The origin is part
+/// of the node's equality: an authored and a synthesized connective with the
+/// same operator and operands are different nodes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConnectiveOrigin {
+    /// The connective appears in the authored source.
+    Authored,
+    /// The connective was synthesized by the checker, for example to compose
+    /// a derived ordering.
+    Synthesized,
+}
+
 /// Integer addition, subtraction or multiplication.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Arithmetic {
@@ -348,8 +364,9 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     IeeeTotalOrder(OrderedKind, Child, Child),
     /// `quire.op.ieee.bit_identical` comparison.
     IeeeBitIdentical(Child, Child),
-    /// Boolean connective.
-    Connective(Connective, Child, Child),
+    /// Boolean connective with the origin of the node, its left operand and
+    /// its skippable right operand.
+    Connective(Connective, ConnectiveOrigin, Child, Child),
     /// Boolean negation.
     Not(Child),
     /// Read a record field.
@@ -755,7 +772,9 @@ impl<Child, Literal> NodeKind<Child, Literal> {
                 K::IeeeTotalOrder(*kind, child(left), child(right))
             }
             K::IeeeBitIdentical(left, right) => K::IeeeBitIdentical(child(left), child(right)),
-            K::Connective(op, left, right) => K::Connective(*op, child(left), child(right)),
+            K::Connective(op, origin, left, right) => {
+                K::Connective(*op, *origin, child(left), child(right))
+            }
             K::Not(value) => K::Not(child(value)),
             K::Field {
                 operand,
@@ -1004,7 +1023,7 @@ impl<Child, Literal> NodeKind<Child, Literal> {
 
 #[cfg(test)]
 mod tests {
-    use super::{NodeId, NodeKind, NodeRead, OrderedKind};
+    use super::{Connective, ConnectiveOrigin, NodeId, NodeKind, NodeRead, OrderedKind};
     use quire_exact::{FloatType, IeeeWidth, RoundingMode, ValueType};
     use quire_semantic_value::location::{Location, Origin};
 
@@ -1077,5 +1096,89 @@ mod tests {
             panic!("IEEE bit identity changed operation identity");
         };
         assert_eq!((left, right), (19, 20));
+    }
+
+    /// Trace: FR-002-AC-1, FR-002-AC-2
+    #[test]
+    fn connective_read_retains_operator_and_operand_order() {
+        let value_type = ValueType::Boolean;
+        let location = Location::root(Origin::Expression);
+        for (op, left, right) in [
+            (Connective::And, 1, 2),
+            (Connective::Or, 3, 4),
+            (Connective::Implies, 5, 6),
+        ] {
+            let operation =
+                NodeKind::Connective(op, ConnectiveOrigin::Authored, NodeId(left), NodeId(right));
+            let read =
+                NodeRead::from_stored(&operation, &value_type, &location, |id| id.index() + 10);
+            let NodeKind::Connective(read_op, _, read_left, read_right) = read.operation else {
+                panic!("connective changed operation identity");
+            };
+            assert_eq!(read_op, op);
+            assert_eq!((read_left, read_right), (left + 10, right + 10));
+        }
+    }
+
+    fn read_origin(origin: ConnectiveOrigin, location: &Location) -> ConnectiveOrigin {
+        let operation = NodeKind::Connective(Connective::Or, origin, NodeId(1), NodeId(2));
+        let value_type = ValueType::Boolean;
+        let read = NodeRead::from_stored(&operation, &value_type, location, |id| id.index() + 10);
+        let NodeKind::Connective(_, read_origin, _, _) = read.operation else {
+            panic!("connective changed operation identity");
+        };
+        read_origin
+    }
+
+    /// Trace: FR-002-AC-3
+    #[test]
+    fn authored_connective_reads_authored() {
+        let location = Location::root(Origin::Expression);
+        assert_eq!(
+            read_origin(ConnectiveOrigin::Authored, &location),
+            ConnectiveOrigin::Authored
+        );
+    }
+
+    /// Trace: FR-002-AC-4
+    #[test]
+    fn synthesized_connective_reads_synthesized() {
+        let location = Location::root(Origin::Expression);
+        assert_eq!(
+            read_origin(ConnectiveOrigin::Synthesized, &location),
+            ConnectiveOrigin::Synthesized
+        );
+    }
+
+    /// Trace: FR-002-AC-5
+    #[test]
+    fn connective_origin_does_not_depend_on_read_location() {
+        let root = Location::root(Origin::Expression);
+        let child = root.child(0);
+        let other = Location::at(Origin::Expression, &[3, 1]);
+        for origin in [ConnectiveOrigin::Authored, ConnectiveOrigin::Synthesized] {
+            for location in [&root, &child, &other] {
+                assert_eq!(read_origin(origin, location), origin);
+            }
+        }
+    }
+
+    /// Trace: FR-002-AC-6
+    #[test]
+    fn authored_and_synthesized_connectives_are_distinct_nodes() {
+        let authored: NodeKind = NodeKind::Connective(
+            Connective::And,
+            ConnectiveOrigin::Authored,
+            NodeId(1),
+            NodeId(2),
+        );
+        let synthesized: NodeKind = NodeKind::Connective(
+            Connective::And,
+            ConnectiveOrigin::Synthesized,
+            NodeId(1),
+            NodeId(2),
+        );
+        assert_ne!(authored, synthesized);
+        assert_eq!(authored.clone(), authored);
     }
 }
