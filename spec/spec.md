@@ -31,9 +31,10 @@ reinterpreting its wire form.
 
 The current requirement inventory covers the IEEE checked-node vocabulary in
 [FR-001](functional/FR-001-ieee-checked-node-vocabulary.md), derived from
-[US-001](usecase/US-001-inspect-ieee-checked-nodes.md). FR-001 is **planned until
-IR-1259 lands**. Other existing crate behavior is outside this initial
-inventory and is not assigned a new requirement by this change.
+[US-001](usecase/US-001-inspect-ieee-checked-nodes.md). FR-001 is implemented by
+the checked-node descriptors and borrowed projections. Other existing crate
+behavior is outside this initial inventory and is not assigned a new requirement
+by this change.
 
 The IEEE arithmetic, comparison, rounding, and diagnostic semantics remain
 owned by QSpec; contract-ir owns operation identity and admission. This
@@ -43,7 +44,7 @@ repository owns the typed checked representation and its borrowed projection.
 
 The [user story](usecase/US-001-inspect-ieee-checked-nodes.md) records the
 consumer need. The [functional requirement](functional/FR-001-ieee-checked-node-vocabulary.md)
-defines the currently planned typed-read obligations and acceptance criteria.
+defines the implemented typed-read obligations and acceptance criteria.
 
 ## Verification
 

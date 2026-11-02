@@ -2,7 +2,7 @@
 id: FR-001
 title: Preserve IEEE operation identity in checked node reads
 type: FR
-status: planned
+status: implemented
 relationships:
   - target: "ix://agent-ix/quire-eval/US-001"
     type: implements
@@ -14,7 +14,7 @@ relationships:
 When a checked expression uses a catalogue-admitted IEEE fused multiply-add,
 total-order, or bit-identity operation, `quire-checked` SHALL retain its
 contract-ir operation identity and SHALL expose a typed `NodeKind` read with
-the admitted operands. This requirement is **planned until IR-1259 lands**.
+the admitted operands.
 
 ## Behavior
 

@@ -126,6 +126,14 @@ fn every_operation_projects_all_children_and_retains_metadata() {
         ),
         (NodeKind::IeeeSquareRoot(RoundingMode::Exact, 1), vec![1]),
         (
+            NodeKind::IeeeFloat32Fma(RoundingMode::TowardZero, 1, 2, 3),
+            vec![1, 2, 3],
+        ),
+        (
+            NodeKind::IeeeFloat64Fma(RoundingMode::NearestEven, 1, 2, 3),
+            vec![1, 2, 3],
+        ),
+        (
             NodeKind::Quantity(ArithmeticOperator::Add, 1, 2),
             vec![1, 2],
         ),
@@ -139,6 +147,11 @@ fn every_operation_projects_all_children_and_retains_metadata() {
             vec![1, 2],
         ),
         (NodeKind::IeeeNumericEquality(1, 2), vec![1, 2]),
+        (
+            NodeKind::IeeeTotalOrder(OrderedKind::Float, 1, 2),
+            vec![1, 2],
+        ),
+        (NodeKind::IeeeBitIdentical(1, 2), vec![1, 2]),
         (NodeKind::Connective(Connective::And, 1, 2), vec![1, 2]),
         (NodeKind::Not(1), vec![1]),
         (
@@ -357,7 +370,7 @@ fn every_operation_projects_all_children_and_retains_metadata() {
         ),
     ];
 
-    assert_eq!(cases.len(), 56, "a canonical variant was omitted");
+    assert_eq!(cases.len(), 60, "a canonical variant was omitted");
     for (stored, expected_children) in cases {
         let mut seen = Vec::new();
         let mut literal_reads = 0;
