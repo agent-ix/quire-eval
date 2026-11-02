@@ -1100,23 +1100,70 @@ mod tests {
 
     /// Trace: FR-002-AC-1, FR-002-AC-2
     #[test]
-    fn connective_read_retains_origin_and_operand_order() {
+    fn connective_read_retains_operator_and_operand_order() {
         let value_type = ValueType::Boolean;
         let location = Location::root(Origin::Expression);
-        for origin in [ConnectiveOrigin::Authored, ConnectiveOrigin::Synthesized] {
-            let operation = NodeKind::Connective(Connective::Or, origin, NodeId(1), NodeId(2));
+        for (op, left, right) in [
+            (Connective::And, 1, 2),
+            (Connective::Or, 3, 4),
+            (Connective::Implies, 5, 6),
+        ] {
+            let operation =
+                NodeKind::Connective(op, ConnectiveOrigin::Authored, NodeId(left), NodeId(right));
             let read =
                 NodeRead::from_stored(&operation, &value_type, &location, |id| id.index() + 10);
-            let NodeKind::Connective(op, read_origin, left, right) = read.operation else {
+            let NodeKind::Connective(read_op, _, read_left, read_right) = read.operation else {
                 panic!("connective changed operation identity");
             };
-            assert_eq!(op, Connective::Or);
-            assert_eq!(read_origin, origin);
-            assert_eq!((left, right), (11, 12));
+            assert_eq!(read_op, op);
+            assert_eq!((read_left, read_right), (left + 10, right + 10));
         }
     }
 
+    fn read_origin(origin: ConnectiveOrigin, location: &Location) -> ConnectiveOrigin {
+        let operation = NodeKind::Connective(Connective::Or, origin, NodeId(1), NodeId(2));
+        let value_type = ValueType::Boolean;
+        let read = NodeRead::from_stored(&operation, &value_type, location, |id| id.index() + 10);
+        let NodeKind::Connective(_, read_origin, _, _) = read.operation else {
+            panic!("connective changed operation identity");
+        };
+        read_origin
+    }
+
     /// Trace: FR-002-AC-3
+    #[test]
+    fn authored_connective_reads_authored() {
+        let location = Location::root(Origin::Expression);
+        assert_eq!(
+            read_origin(ConnectiveOrigin::Authored, &location),
+            ConnectiveOrigin::Authored
+        );
+    }
+
+    /// Trace: FR-002-AC-4
+    #[test]
+    fn synthesized_connective_reads_synthesized() {
+        let location = Location::root(Origin::Expression);
+        assert_eq!(
+            read_origin(ConnectiveOrigin::Synthesized, &location),
+            ConnectiveOrigin::Synthesized
+        );
+    }
+
+    /// Trace: FR-002-AC-5
+    #[test]
+    fn connective_origin_does_not_depend_on_read_location() {
+        let root = Location::root(Origin::Expression);
+        let child = root.child(0);
+        let other = Location::at(Origin::Expression, &[3, 1]);
+        for origin in [ConnectiveOrigin::Authored, ConnectiveOrigin::Synthesized] {
+            for location in [&root, &child, &other] {
+                assert_eq!(read_origin(origin, location), origin);
+            }
+        }
+    }
+
+    /// Trace: FR-002-AC-6
     #[test]
     fn authored_and_synthesized_connectives_are_distinct_nodes() {
         let authored: NodeKind = NodeKind::Connective(

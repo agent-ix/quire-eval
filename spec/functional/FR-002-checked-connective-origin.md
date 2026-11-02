@@ -12,27 +12,45 @@ relationships:
 ## Description
 
 When a checked expression contains a boolean connective, `quire-checked` SHALL
-retain on that node whether the connective is authored or synthesized by the
-checker, and a borrowed node read SHALL expose the same origin together with
-the connective operator and the left and right operands in order.
+store on that node a `ConnectiveOrigin` stated by the producer of the node.
 
 ## Behavior
 
-`NodeKind::Connective` carries the operator, a `ConnectiveOrigin`
-(`Authored` or `Synthesized`), and two ordered operands. The origin is part of
-node equality: an authored and a synthesized connective with the same operator
-and operands are different nodes. Producers state the origin explicitly; a
-consumer never derives it from locations.
+`NodeKind::Connective` carries the operator, a `ConnectiveOrigin`, and two
+ordered operands.
+
+- `ConnectiveOrigin::Authored` marks a connective that the producer built from
+  a connective written in the source or checked form for that clause.
+- `ConnectiveOrigin::Synthesized` marks a connective that the producer
+  introduces to compose another construct, for example the composition of a
+  float ordering from simpler comparisons.
+
+The producer states the origin when it builds the node.
+
+A borrowed node read SHALL expose the stored origin, the operator, and the left
+and right operands in order.
+
+A consumer of a connective node SHALL NOT derive its origin from location data;
+the origin is read from the node.
+
+The origin is part of node equality: two connective nodes with the same
+operator and operands but different origins are different nodes.
+
+The decision-recording semantics that depend on the origin are specified by the
+requirements of the consuming evaluator (QSL FR-265, to be amended); this
+requirement defines only the typed carrier.
 
 ## Acceptance Criteria
 
 | ID | Criteria | Verification |
 | --- | --- | --- |
-| FR-002-AC-1 | A borrowed read of a stored connective node retains its operator and its left and right operands in source order. | Test |
-| FR-002-AC-2 | A borrowed read of a stored connective node exposes `ConnectiveOrigin::Authored` for an authored node and `ConnectiveOrigin::Synthesized` for a synthesized node. | Test |
-| FR-002-AC-3 | Two connective nodes that differ only in origin are not equal. | Test |
+| FR-002-AC-1 | A borrowed read of a stored connective node exposes the operator the node was stored with. | Test |
+| FR-002-AC-2 | A borrowed read of a stored connective node exposes its left and right operands in stored order. | Test |
+| FR-002-AC-3 | A borrowed read of a node stored with `ConnectiveOrigin::Authored` exposes `Authored`. | Test |
+| FR-002-AC-4 | A borrowed read of a node stored with `ConnectiveOrigin::Synthesized` exposes `Synthesized`. | Test |
+| FR-002-AC-5 | A borrowed read of the same stored connective node yields the same origin whichever location the read is given. | Test |
+| FR-002-AC-6 | Two connective nodes that differ only in origin are not equal. | Test |
 
 ## Dependencies
 
-- The decision-recording semantics that consume the origin are owned by the
-  QSL evaluator specification; this requirement defines only the typed carrier.
+- The consuming evaluator's requirements own what is recorded for each origin.
