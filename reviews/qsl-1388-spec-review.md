@@ -31,3 +31,19 @@ Mergeable with the findings below as non-blocking. AC-3 is single-claim and fail
 ## Open question
 
 FR-265 describes the walk as "the operand of and or or on which evaluation stopped" and says nothing about authored versus synthesized connectives or about the float_ordering synthesis. The authored-clause decision rule that motivates this carrier is therefore unspecified in QSL main; the QSL side needs to state it (IR-1276 says PR #2088 owns the behavior).
+
+## New findings (disposition pass 1)
+
+| ID | Severity | Summary | Refs |
+| --- | --- | --- | --- |
+| FND-006 | low | The Authored definition ends "or checked form for that clause", which does not say what checked form counts as authored; a producer could read it either way | spec/functional/FR-002-checked-connective-origin.md:23-25 |
+
+## Dispositions
+
+| FND | Outcome | Reason |
+| --- | --- | --- |
+| FND-001 | fixed | Behavior now defines Authored and Synthesized in terms of what the producer builds, with no location input, and forbids consumers from deriving origin from location data; decision semantics are delegated to the consumer's requirements (QSL FR-265, to be amended, still an open item in QSL) |
+| FND-002 | fixed | Split into FR-002-AC-3 (Authored reads Authored) and FR-002-AC-4 (Synthesized reads Synthesized), each with its own tagged test |
+| FND-003 | fixed | Split into FR-002-AC-1 (operator) and FR-002-AC-2 (operand order); test iterates all three operators and distinct operands |
+| FND-004 | fixed | Description has one SHALL; the location prohibition is now a normative SHALL NOT, covered at read level by FR-002-AC-5 |
+| FND-005 | fixed | spec.md paragraph is re-wrapped across lines |
