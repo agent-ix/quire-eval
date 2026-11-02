@@ -3,7 +3,7 @@
 
 use quire_checked::key::DeclarationKey;
 use quire_checked::node::{
-    Arithmetic, AuthoredBound, CaseArm, CheckedLiteral, Connective, EndSide,
+    Arithmetic, AuthoredBound, CaseArm, CheckedLiteral, Connective, ConnectiveOrigin, EndSide,
     IntegerDivisionOperator, OrderedKind, RecordField, RecordSlot, Visit,
 };
 use quire_checked::{NodeKind, NodeRead};
@@ -152,7 +152,14 @@ fn every_operation_projects_all_children_and_retains_metadata() {
             vec![1, 2],
         ),
         (NodeKind::IeeeBitIdentical(1, 2), vec![1, 2]),
-        (NodeKind::Connective(Connective::And, 1, 2), vec![1, 2]),
+        (
+            NodeKind::Connective(Connective::And, ConnectiveOrigin::Authored, 1, 2),
+            vec![1, 2],
+        ),
+        (
+            NodeKind::Connective(Connective::Implies, ConnectiveOrigin::Synthesized, 1, 2),
+            vec![1, 2],
+        ),
         (NodeKind::Not(1), vec![1]),
         (
             NodeKind::Field {
@@ -370,7 +377,7 @@ fn every_operation_projects_all_children_and_retains_metadata() {
         ),
     ];
 
-    assert_eq!(cases.len(), 60, "a canonical variant was omitted");
+    assert_eq!(cases.len(), 61, "a canonical variant was omitted");
     for (stored, expected_children) in cases {
         let mut seen = Vec::new();
         let mut literal_reads = 0;
