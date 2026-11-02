@@ -110,6 +110,8 @@ pub enum OrderedKind {
     Rationals,
     /// Decimal values.
     Decimals,
+    /// IEEE values in the distinct IEEE total-order operation.
+    Float,
     /// Ordered enum members.
     Enums,
     /// Profile-ordered text.
@@ -323,6 +325,10 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     Ieee(ArithmeticOperator, RoundingMode, Child, Child),
     /// IEEE square root.
     IeeeSquareRoot(RoundingMode, Child),
+    /// `quire.op.ieee.float32.fma` with three ordered operands.
+    IeeeFloat32Fma(RoundingMode, Child, Child, Child),
+    /// `quire.op.ieee.float64.fma` with three ordered operands.
+    IeeeFloat64Fma(RoundingMode, Child, Child, Child),
     /// Quantity arithmetic.
     Quantity(ArithmeticOperator, Child, Child),
     /// Rational or decimal conversion.
@@ -338,6 +344,10 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     ),
     /// IEEE numeric equality.
     IeeeNumericEquality(Child, Child),
+    /// `quire.op.ieee.total_order`, whose admitted domain is `OrderedKind::Float`.
+    IeeeTotalOrder(OrderedKind, Child, Child),
+    /// `quire.op.ieee.bit_identical` comparison.
+    IeeeBitIdentical(Child, Child),
     /// Boolean connective.
     Connective(Connective, Child, Child),
     /// Boolean negation.
@@ -726,6 +736,12 @@ impl<Child, Literal> NodeKind<Child, Literal> {
                 K::Ieee(*op, *rounding, child(left), child(right))
             }
             K::IeeeSquareRoot(rounding, value) => K::IeeeSquareRoot(*rounding, child(value)),
+            K::IeeeFloat32Fma(rounding, first, second, third) => {
+                K::IeeeFloat32Fma(*rounding, child(first), child(second), child(third))
+            }
+            K::IeeeFloat64Fma(rounding, first, second, third) => {
+                K::IeeeFloat64Fma(*rounding, child(first), child(second), child(third))
+            }
             K::Quantity(op, left, right) => K::Quantity(*op, child(left), child(right)),
             K::ConvertDecimal(value, target) => K::ConvertDecimal(child(value), target.clone()),
             K::Order(op, kind, left, right) => K::Order(*op, *kind, child(left), child(right)),
@@ -735,6 +751,10 @@ impl<Child, Literal> NodeKind<Child, Literal> {
             K::IeeeNumericEquality(left, right) => {
                 K::IeeeNumericEquality(child(left), child(right))
             }
+            K::IeeeTotalOrder(kind, left, right) => {
+                K::IeeeTotalOrder(*kind, child(left), child(right))
+            }
+            K::IeeeBitIdentical(left, right) => K::IeeeBitIdentical(child(left), child(right)),
             K::Connective(op, left, right) => K::Connective(*op, child(left), child(right)),
             K::Not(value) => K::Not(child(value)),
             K::Field {
@@ -979,5 +999,83 @@ impl<Child, Literal> NodeKind<Child, Literal> {
             #[cfg(seam_probe)]
             K::__SeamProbe => K::__SeamProbe,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{NodeId, NodeKind, NodeRead, OrderedKind};
+    use quire_exact::{FloatType, IeeeWidth, RoundingMode, ValueType};
+    use quire_semantic_value::location::{Location, Origin};
+
+    /// Trace: FR-001-AC-1, FR-001-AC-6
+    #[test]
+    fn float32_fma_read_retains_rounding_and_three_operand_order() {
+        let operation = NodeKind::IeeeFloat32Fma(
+            RoundingMode::TowardPositive,
+            NodeId(1),
+            NodeId(2),
+            NodeId(3),
+        );
+        let value_type = ValueType::Float(FloatType::new(
+            IeeeWidth::Binary32,
+            RoundingMode::TowardPositive,
+        ));
+        let location = Location::root(Origin::Expression);
+        let read = NodeRead::from_stored(&operation, &value_type, &location, |id| id.index() + 10);
+        let NodeKind::IeeeFloat32Fma(rounding, first, second, third) = read.operation else {
+            panic!("float32 fma changed operation identity");
+        };
+        assert_eq!(rounding, RoundingMode::TowardPositive);
+        assert_eq!((first, second, third), (11, 12, 13));
+    }
+
+    /// Trace: FR-001-AC-2, FR-001-AC-6
+    #[test]
+    fn float64_fma_read_has_distinct_identity_and_operand_order() {
+        let operation = NodeKind::IeeeFloat64Fma(
+            RoundingMode::TowardNegative,
+            NodeId(4),
+            NodeId(5),
+            NodeId(6),
+        );
+        let value_type = ValueType::Float(FloatType::new(
+            IeeeWidth::Binary64,
+            RoundingMode::TowardNegative,
+        ));
+        let location = Location::root(Origin::Expression);
+        let read = NodeRead::from_stored(&operation, &value_type, &location, |id| id.index() + 10);
+        let NodeKind::IeeeFloat64Fma(rounding, first, second, third) = read.operation else {
+            panic!("float64 fma changed operation identity");
+        };
+        assert_eq!(rounding, RoundingMode::TowardNegative);
+        assert_eq!((first, second, third), (14, 15, 16));
+    }
+
+    /// Trace: FR-001-AC-3, FR-001-AC-5, FR-001-AC-6
+    #[test]
+    fn total_order_read_retains_float_domain_without_ordinary_order() {
+        let operation = NodeKind::IeeeTotalOrder(OrderedKind::Float, NodeId(7), NodeId(8));
+        let value_type = ValueType::Boolean;
+        let location = Location::root(Origin::Expression);
+        let read = NodeRead::from_stored(&operation, &value_type, &location, |id| id.index() + 10);
+        let NodeKind::IeeeTotalOrder(kind, left, right) = read.operation else {
+            panic!("IEEE total order changed operation identity");
+        };
+        assert_eq!(kind, OrderedKind::Float);
+        assert_eq!((left, right), (17, 18));
+    }
+
+    /// Trace: FR-001-AC-4, FR-001-AC-6
+    #[test]
+    fn bit_identity_read_retains_distinct_identity_and_operand_order() {
+        let operation = NodeKind::IeeeBitIdentical(NodeId(9), NodeId(10));
+        let value_type = ValueType::Boolean;
+        let location = Location::root(Origin::Expression);
+        let read = NodeRead::from_stored(&operation, &value_type, &location, |id| id.index() + 10);
+        let NodeKind::IeeeBitIdentical(left, right) = read.operation else {
+            panic!("IEEE bit identity changed operation identity");
+        };
+        assert_eq!((left, right), (19, 20));
     }
 }
