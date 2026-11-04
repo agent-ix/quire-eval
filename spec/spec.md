@@ -38,7 +38,8 @@ carried on checked connective nodes is specified in
 [FR-002](functional/FR-002-checked-connective-origin.md), derived from
 [US-002](usecase/US-002-distinguish-authored-connectives.md). The shared
 collection removal nodes, projections and value operations are specified in
-[FR-003](functional/FR-003-shrink-checked-collections.md). Other crate behavior
+[FR-003](functional/FR-003-shrink-checked-collections.md). The quantity-power descriptor and borrowed read are specified in
+[FR-004](functional/FR-004-quantity-power-node.md). Other crate behavior
 remains outside this requirement inventory.
 
 The IEEE arithmetic, comparison, rounding, and diagnostic semantics remain

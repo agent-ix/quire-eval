@@ -93,6 +93,7 @@ fn every_operation_projects_all_children_and_retains_metadata() {
             vec![1, 2],
         ),
         (NodeKind::Negate(1), vec![1]),
+        (NodeKind::QuantityPower(1, 2), vec![1, 2]),
         (
             NodeKind::Divide {
                 left: 1,
@@ -380,7 +381,7 @@ fn every_operation_projects_all_children_and_retains_metadata() {
         ),
     ];
 
-    assert_eq!(cases.len(), 61, "a canonical variant was omitted");
+    assert_eq!(cases.len(), 64, "a canonical variant was omitted");
     for (stored, expected_children) in cases {
         let mut seen = Vec::new();
         let mut literal_reads = 0;
