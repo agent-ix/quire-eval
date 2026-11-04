@@ -1201,7 +1201,9 @@ mod collection_retirement_tests {
     fn removal_reads_preserve_operation_operands_and_metadata() {
         let location = Location::root(Origin::Expression);
         let value_type = ValueType::collection(quire_exact::CollectionType::new(
-            quire_exact::CollectionKind::Sequence, ValueType::Boolean, None,
+            quire_exact::CollectionKind::Sequence,
+            ValueType::Boolean,
+            None,
         ));
         let drop = NodeKind::DropFirst(NodeId(7));
         let read = NodeRead::from_stored(&drop, &value_type, &location, |id| id.index() + 10);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Exhaustive FR-400-AC-11 projection of the canonical operation vocabulary.
 
+use ix_trace_rs::trace;
 use quire_checked::key::DeclarationKey;
 use quire_checked::node::{
     Arithmetic, AuthoredBound, CaseArm, CheckedLiteral, Connective, ConnectiveOrigin, EndSide,
@@ -18,7 +19,7 @@ use quire_semantic_value::declaration::{
 };
 use quire_semantic_value::enumeration::EnumMemberIndex;
 
-/// Trace: FR-400-AC-11
+#[trace("FR-400-AC-11")]
 #[test]
 fn every_operation_projects_all_children_and_retains_metadata() {
     let key = NodeKey::new("fixture", vec![PathSegment::Text("node".into())], 0).unwrap();

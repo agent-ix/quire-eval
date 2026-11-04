@@ -5,9 +5,8 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 
 use quire_exact::{
-    collection::{form_grouped, member_equal},
-    compare_keys, CardinalityBound, CollectionKind, CollectionType, CollectionValue,
-    EmptyCardinalityBound, IllTyped, IllTypedCause, Meter, Outcome, Value,
+    compare_keys, form_grouped, member_equal, CardinalityBound, CollectionKind, CollectionType,
+    CollectionValue, EmptyCardinalityBound, IllTyped, IllTypedCause, Meter, Outcome, Value,
 };
 use quire_semantic_value::declaration::{EnvironmentFailure, TypeEnvironment};
 

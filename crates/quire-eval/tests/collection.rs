@@ -6,10 +6,9 @@ mod support;
 use ix_trace_rs::trace;
 use quire_eval::collection::{drop_first, remove_one, CollectionFailure};
 use quire_exact::{
-    collection::{form_collection, form_grouped, member_equal},
-    CardinalityBound, ChargePoint, CollectionKind, CollectionType, CollectionValue, FloatType,
-    IeeeValue, IeeeWidth, IllTyped, IllTypedCause, InjectedDenial, Meter, Outcome, Value,
-    ValueType,
+    form_collection, form_grouped, member_equal, CardinalityBound, ChargePoint, CollectionKind,
+    CollectionType, CollectionValue, FloatType, IeeeValue, IeeeWidth, IllTyped, IllTypedCause,
+    InjectedDenial, Meter, Outcome, Value, ValueType,
 };
 use quire_semantic_value::declaration::{CompositeDeclaration, CompositeShape, TypeEnvironment};
 
@@ -45,10 +44,10 @@ fn bits(value: &Value) -> Vec<bool> {
 }
 
 fn completed(result: Result<Outcome<Value>, CollectionFailure>) -> Value {
-    result
-        .expect("operation admits")
-        .completed()
-        .expect("operation completes")
+    match result.expect("operation admits") {
+        Outcome::Completed(value) => value,
+        other => panic!("operation completes, got {other:?}"),
+    }
 }
 
 #[trace("FR-003-AC-2", "FR-003-AC-6")]
@@ -76,9 +75,19 @@ fn drop_keeps_survivor_order_and_charges_formation_only() {
         );
         let mut expected_meter = support::meter(10_000);
         let target = CollectionType::new(kind, ValueType::Boolean, None);
-        assert!(matches!(form_grouped(&target, expected.iter().copied().map(Value::Boolean).collect(), &mut expected_meter), Outcome::Completed(_)));
+        assert!(matches!(
+            form_grouped(
+                &target,
+                expected.iter().copied().map(Value::Boolean).collect(),
+                &mut expected_meter
+            ),
+            Outcome::Completed(_)
+        ));
         assert_eq!(meter.admitted_charges(), expected_meter.admitted_charges());
-        assert_eq!(meter.consumed(quire_exact::LimitKind::ResultUnits), expected_meter.consumed(quire_exact::LimitKind::ResultUnits));
+        assert_eq!(
+            meter.consumed(quire_exact::LimitKind::ResultUnits),
+            expected_meter.consumed(quire_exact::LimitKind::ResultUnits)
+        );
         let empty = source(kind, Some(CardinalityBound::at_most(0)), &[]);
         assert!(bits(&completed(drop_first(
             collection(&empty),
@@ -90,10 +99,10 @@ fn drop_keeps_survivor_order_and_charges_formation_only() {
         let input = source(kind, None, &[true, false]);
         let mut meter = support::meter(10_000);
         assert_eq!(
-            drop_first(collection(&input), &mut meter),
-            Err(CollectionFailure::IllTyped(IllTyped {
+            drop_first(collection(&input), &mut meter).unwrap_err(),
+            CollectionFailure::IllTyped(IllTyped {
                 cause: IllTypedCause::OperatorIneligible
-            }))
+            })
         );
         assert!(meter.admitted_charges().is_empty());
     }
@@ -186,10 +195,11 @@ fn a_wrong_probe_type_refuses_before_scan_or_formation() {
             &Value::Integer(1_i64.into()),
             &TypeEnvironment::default(),
             &mut meter
-        ),
-        Err(CollectionFailure::IllTyped(IllTyped {
+        )
+        .unwrap_err(),
+        CollectionFailure::IllTyped(IllTyped {
             cause: IllTypedCause::TypeMismatch
-        }))
+        })
     );
     assert!(meter.admitted_charges().is_empty());
 }
@@ -197,20 +207,44 @@ fn a_wrong_probe_type_refuses_before_scan_or_formation() {
 #[trace("FR-003-AC-5")]
 #[test]
 fn removal_uses_schema_conformance_instead_of_exact_leaf_membership() {
-    let key = |name: &str| quire_exact::NodeKey::new("fixture", vec![quire_exact::PathSegment::Text(name.into())], 0).unwrap();
+    let key = |name: &str| {
+        quire_exact::NodeKey::new(
+            "fixture",
+            vec![quire_exact::PathSegment::Text(name.into())],
+            0,
+        )
+        .unwrap()
+    };
     let parent = key("parent");
     let child = key("child");
-    let environment = TypeEnvironment::new([
-        CompositeDeclaration::new(parent.clone(), "Parent", CompositeShape::Record(vec![])),
-        CompositeDeclaration::new(child.clone(), "Child", CompositeShape::Record(vec![])).with_supertypes(vec![parent.clone()]),
-    ], []).expect("the subtype registry admits");
-    let value = environment.record(child, vec![]).expect("the child record admits");
+    let environment = TypeEnvironment::new(
+        [
+            CompositeDeclaration::new(parent.clone(), "Parent", CompositeShape::Record(vec![])),
+            CompositeDeclaration::new(child.clone(), "Child", CompositeShape::Record(vec![]))
+                .with_supertypes(vec![parent.clone()]),
+        ],
+        [],
+    )
+    .expect("the subtype registry admits");
+    let value = environment
+        .record(child, vec![])
+        .expect("the child record admits");
     let element_type = ValueType::Composite(parent);
-    assert!(!element_type.admits(&value), "exact membership is insufficient");
+    assert!(
+        !element_type.admits(&value),
+        "exact membership is insufficient"
+    );
     assert_eq!(environment.admits(&element_type, &value), Ok(true));
     let ty = CollectionType::new(CollectionKind::Sequence, element_type, None);
-    let input = form_grouped(&ty, vec![value.clone()], &mut support::meter(10_000)).completed().unwrap();
-    let result = completed(remove_one(collection(&input), &value, &environment, &mut support::meter(10_000)));
+    let input = form_grouped(&ty, vec![value.clone()], &mut support::meter(10_000))
+        .completed()
+        .unwrap();
+    let result = completed(remove_one(
+        collection(&input),
+        &value,
+        &environment,
+        &mut support::meter(10_000),
+    ));
     assert!(collection(&result).elements().is_empty());
     assert_eq!(collection(&result).collection_type(), &ty);
 }
@@ -285,7 +319,17 @@ fn floating_membership_removes_the_matching_nan_payload_only() {
         &TypeEnvironment::default(),
         &mut support::meter(10_000),
     ));
-    assert_eq!(collection(&result).elements(), [second, first]);
+    let payloads: Vec<_> = collection(&result)
+        .elements()
+        .iter()
+        .map(|value| {
+            let Value::Float(value) = value else {
+                panic!("floating member")
+            };
+            value.bits()
+        })
+        .collect();
+    assert_eq!(payloads, [0x7ff8_0000_0000_0002, 0x7ff8_0000_0000_0001]);
 }
 
 #[trace("FR-003-AC-7")]
