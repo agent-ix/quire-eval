@@ -176,7 +176,7 @@ dependencies = [
 [[package]]
 name = "quire-exact"
 version = "0.1.0"
-source = "git+https://github.com/agent-ix/quire-exact?branch=main#99ace5e280e1b95dc9f192ca7d0cd7a6580b37b2"
+source = "git+https://github.com/agent-ix/quire-exact?branch=main#2fd32cc1b970dde49046219132eab97418395258"
 dependencies = [
  "allocator-api2",
  "arrayvec",
