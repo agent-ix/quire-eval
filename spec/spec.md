@@ -16,8 +16,9 @@ standards_alignment:
 ## System Overview
 
 `quire-checked` exposes admitted expression nodes to downstream evaluation
-consumers; `quire-eval` executes checked expressions. This initial specification
-records the checked IEEE vocabulary slice.
+consumers; `quire-eval` supplies shared evaluation operations and executes
+checked closures through its scheduler. The requirement inventory covers the
+IEEE vocabulary, connective origin and shared collection removal operations.
 
 ## Purpose
 
@@ -35,9 +36,10 @@ The current requirement inventory covers the IEEE checked-node vocabulary in
 the checked-node descriptors and borrowed projections. The connective origin
 carried on checked connective nodes is specified in
 [FR-002](functional/FR-002-checked-connective-origin.md), derived from
-[US-002](usecase/US-002-distinguish-authored-connectives.md). Other existing
-crate behavior is outside this initial inventory and is not assigned a new requirement
-by this change.
+[US-002](usecase/US-002-distinguish-authored-connectives.md). The shared
+collection removal nodes, projections and value operations are specified in
+[FR-003](functional/FR-003-shrink-checked-collections.md). Other crate behavior
+remains outside this requirement inventory.
 
 The IEEE arithmetic, comparison, rounding, and diagnostic semantics remain
 owned by QSpec; contract-ir owns operation identity and admission. This

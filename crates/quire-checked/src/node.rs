@@ -504,6 +504,10 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     Size(Child),
     /// Test collection membership.
     Contains(Child, Child),
+    /// Remove the first occurrence of a sequence or ordered set.
+    DropFirst(Child),
+    /// Remove the first matching occurrence, scanning as collection membership.
+    RemoveOne(Child, Child),
     /// Read all instances of a population.
     AllInstances {
         /// The population operand, bound, or identity.
@@ -909,6 +913,8 @@ impl<Child, Literal> NodeKind<Child, Literal> {
             }
             K::Size(value) => K::Size(child(value)),
             K::Contains(left, right) => K::Contains(child(left), child(right)),
+            K::DropFirst(source) => K::DropFirst(child(source)),
+            K::RemoveOne(source, value) => K::RemoveOne(child(source), child(value)),
             K::AllInstances { population } => K::AllInstances {
                 population: child(population),
             },
@@ -1180,5 +1186,38 @@ mod tests {
         );
         assert_ne!(authored, synthesized);
         assert_eq!(authored.clone(), authored);
+    }
+}
+
+#[cfg(test)]
+mod collection_retirement_tests {
+    use super::{NodeId, NodeKind, NodeRead};
+    use ix_trace_rs::trace;
+    use quire_exact::ValueType;
+    use quire_semantic_value::location::{Location, Origin};
+
+    #[trace("FR-003-AC-1")]
+    #[test]
+    fn removal_reads_preserve_operation_operands_and_metadata() {
+        let location = Location::root(Origin::Expression);
+        let value_type = ValueType::collection(quire_exact::CollectionType::new(
+            quire_exact::CollectionKind::Sequence, ValueType::Boolean, None,
+        ));
+        let drop = NodeKind::DropFirst(NodeId(7));
+        let read = NodeRead::from_stored(&drop, &value_type, &location, |id| id.index() + 10);
+        assert!(matches!(read.operation, NodeKind::DropFirst(17)));
+        assert!(core::ptr::eq(read.value_type, &value_type));
+        assert!(core::ptr::eq(read.location, &location));
+        let remove = NodeKind::RemoveOne(NodeId(7), NodeId(3));
+        let mut visited = alloc::vec::Vec::new();
+        let read = NodeRead::from_stored(&remove, &value_type, &location, |id| {
+            visited.push(id.index());
+            id.index() + 10
+        });
+        assert!(matches!(read.operation, NodeKind::RemoveOne(17, 13)));
+        assert_eq!(visited, [7, 3]);
+        assert!(core::ptr::eq(read.value_type, &value_type));
+        assert!(core::ptr::eq(read.location, &location));
+        assert_ne!(drop, remove);
     }
 }

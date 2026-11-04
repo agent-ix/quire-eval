@@ -279,6 +279,8 @@ fn every_operation_projects_all_children_and_retains_metadata() {
         ),
         (NodeKind::Size(1), vec![1]),
         (NodeKind::Contains(1, 2), vec![1, 2]),
+        (NodeKind::DropFirst(1), vec![1]),
+        (NodeKind::RemoveOne(1, 2), vec![1, 2]),
         (NodeKind::AllInstances { population: 1 }, vec![1]),
         (
             NodeKind::Lookup {

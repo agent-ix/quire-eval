@@ -19,6 +19,7 @@ quire-exact = { git = "https://github.com/agent-ix/quire-exact", branch = "main"
 thiserror = { version = "2.0.20", default-features = false }
 
 [dev-dependencies]
+ix-trace-rs = { git = "https://github.com/agent-ix/ix-trace-rs", branch = "main" }
 # The ordered charge log, to assert the exact charge sequence of a run.
 quire-exact = { git = "https://github.com/agent-ix/quire-exact", branch = "main", default-features = false, features = ["test-support"] }
 

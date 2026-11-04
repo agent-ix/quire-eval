@@ -35,6 +35,7 @@ extern crate alloc;
 mod body;
 mod cause;
 mod closure;
+pub mod collection;
 mod integer;
 mod registry;
 mod result;
