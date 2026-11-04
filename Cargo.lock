@@ -9,6 +9,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "arrayvec"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -67,6 +73,11 @@ dependencies = [
  "typenum",
  "version_check",
 ]
+
+[[package]]
+name = "ix-trace-rs"
+version = "0.1.2"
+source = "git+https://github.com/agent-ix/ix-trace-rs?branch=main#e29cc07f70394ff018884d12406c1e150bded5f4"
 
 [[package]]
 name = "libc"
@@ -143,6 +154,7 @@ dependencies = [
 name = "quire-checked"
 version = "0.1.0"
 dependencies = [
+ "ix-trace-rs",
  "quire-canonical",
  "quire-exact",
  "quire-semantic-value",
@@ -155,6 +167,7 @@ dependencies = [
 name = "quire-eval"
 version = "0.1.0"
 dependencies = [
+ "ix-trace-rs",
  "quire-exact",
  "quire-semantic-value",
  "thiserror",
@@ -163,9 +176,10 @@ dependencies = [
 [[package]]
 name = "quire-exact"
 version = "0.1.0"
-source = "git+https://github.com/agent-ix/quire-exact?branch=main#82e8f9b4d9583ba4eee505550ff80a211333696f"
+source = "git+https://github.com/agent-ix/quire-exact?branch=main#2fd32cc1b970dde49046219132eab97418395258"
 dependencies = [
  "allocator-api2",
+ "arrayvec",
  "num-bigint",
  "num-integer",
  "num-traits",
@@ -179,7 +193,7 @@ dependencies = [
 [[package]]
 name = "quire-semantic-value"
 version = "0.1.0"
-source = "git+https://github.com/agent-ix/quire-semantic-value?branch=main#3cc0b27e19a398f336152ada05972072053fa47e"
+source = "git+https://github.com/agent-ix/quire-semantic-value?branch=main#30c2493163cf35dd00d6dcaad63a7cbe9b2f5290"
 dependencies = [
  "quire-canonical",
  "quire-exact",

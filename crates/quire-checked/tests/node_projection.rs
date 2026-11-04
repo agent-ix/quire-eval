@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Exhaustive FR-400-AC-11 projection of the canonical operation vocabulary.
 
+use ix_trace_rs::trace;
 use quire_checked::key::DeclarationKey;
 use quire_checked::node::{
     Arithmetic, AuthoredBound, CaseArm, CheckedLiteral, Connective, ConnectiveOrigin, EndSide,
@@ -18,7 +19,7 @@ use quire_semantic_value::declaration::{
 };
 use quire_semantic_value::enumeration::EnumMemberIndex;
 
-/// Trace: FR-400-AC-11
+#[trace("FR-400-AC-11")]
 #[test]
 fn every_operation_projects_all_children_and_retains_metadata() {
     let key = NodeKey::new("fixture", vec![PathSegment::Text("node".into())], 0).unwrap();
@@ -92,6 +93,7 @@ fn every_operation_projects_all_children_and_retains_metadata() {
             vec![1, 2],
         ),
         (NodeKind::Negate(1), vec![1]),
+        (NodeKind::QuantityPower(1, 2), vec![1, 2]),
         (
             NodeKind::Divide {
                 left: 1,
@@ -279,6 +281,8 @@ fn every_operation_projects_all_children_and_retains_metadata() {
         ),
         (NodeKind::Size(1), vec![1]),
         (NodeKind::Contains(1, 2), vec![1, 2]),
+        (NodeKind::DropFirst(1), vec![1]),
+        (NodeKind::RemoveOne(1, 2), vec![1, 2]),
         (NodeKind::AllInstances { population: 1 }, vec![1]),
         (
             NodeKind::Lookup {
@@ -377,7 +381,7 @@ fn every_operation_projects_all_children_and_retains_metadata() {
         ),
     ];
 
-    assert_eq!(cases.len(), 61, "a canonical variant was omitted");
+    assert_eq!(cases.len(), 64, "a canonical variant was omitted");
     for (stored, expected_children) in cases {
         let mut seen = Vec::new();
         let mut literal_reads = 0;

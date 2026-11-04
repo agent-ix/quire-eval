@@ -347,6 +347,8 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     IeeeFloat64Fma(RoundingMode, Child, Child, Child),
     /// Quantity arithmetic.
     Quantity(ArithmeticOperator, Child, Child),
+    /// Exact quantity raised to an integer exponent, in base/exponent order.
+    QuantityPower(Child, Child),
     /// Rational or decimal conversion.
     ConvertDecimal(Child, DecimalType),
     /// Ordering comparison.
@@ -504,6 +506,10 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     Size(Child),
     /// Test collection membership.
     Contains(Child, Child),
+    /// Remove the first occurrence of a sequence or ordered set.
+    DropFirst(Child),
+    /// Remove the first matching occurrence, scanning as collection membership.
+    RemoveOne(Child, Child),
     /// Read all instances of a population.
     AllInstances {
         /// The population operand, bound, or identity.
@@ -760,6 +766,7 @@ impl<Child, Literal> NodeKind<Child, Literal> {
                 K::IeeeFloat64Fma(*rounding, child(first), child(second), child(third))
             }
             K::Quantity(op, left, right) => K::Quantity(*op, child(left), child(right)),
+            K::QuantityPower(base, exponent) => K::QuantityPower(child(base), child(exponent)),
             K::ConvertDecimal(value, target) => K::ConvertDecimal(child(value), target.clone()),
             K::Order(op, kind, left, right) => K::Order(*op, *kind, child(left), child(right)),
             K::Equality(op, checked, left, right) => {
@@ -909,6 +916,8 @@ impl<Child, Literal> NodeKind<Child, Literal> {
             }
             K::Size(value) => K::Size(child(value)),
             K::Contains(left, right) => K::Contains(child(left), child(right)),
+            K::DropFirst(source) => K::DropFirst(child(source)),
+            K::RemoveOne(source, value) => K::RemoveOne(child(source), child(value)),
             K::AllInstances { population } => K::AllInstances {
                 population: child(population),
             },
@@ -1180,5 +1189,66 @@ mod tests {
         );
         assert_ne!(authored, synthesized);
         assert_eq!(authored.clone(), authored);
+    }
+}
+
+#[cfg(test)]
+mod collection_retirement_tests {
+    use super::{NodeId, NodeKind, NodeRead};
+    use ix_trace_rs::trace;
+    use quire_exact::ValueType;
+    use quire_semantic_value::location::{Location, Origin};
+
+    #[trace("FR-003-AC-1")]
+    #[test]
+    fn removal_reads_preserve_operation_operands_and_metadata() {
+        let location = Location::root(Origin::Expression);
+        let value_type = ValueType::collection(quire_exact::CollectionType::new(
+            quire_exact::CollectionKind::Sequence,
+            ValueType::Boolean,
+            None,
+        ));
+        let drop = NodeKind::DropFirst(NodeId(7));
+        let read = NodeRead::from_stored(&drop, &value_type, &location, |id| id.index() + 10);
+        assert!(matches!(read.operation, NodeKind::DropFirst(17)));
+        assert!(core::ptr::eq(read.value_type, &value_type));
+        assert!(core::ptr::eq(read.location, &location));
+        let remove = NodeKind::RemoveOne(NodeId(7), NodeId(3));
+        let mut visited = alloc::vec::Vec::new();
+        let read = NodeRead::from_stored(&remove, &value_type, &location, |id| {
+            visited.push(id.index());
+            id.index() + 10
+        });
+        assert!(matches!(read.operation, NodeKind::RemoveOne(17, 13)));
+        assert_eq!(visited, [7, 3]);
+        assert!(core::ptr::eq(read.value_type, &value_type));
+        assert!(core::ptr::eq(read.location, &location));
+        assert_ne!(drop, remove);
+    }
+}
+
+#[cfg(test)]
+mod quantity_power_tests {
+    use super::{NodeId, NodeKind, NodeRead};
+    use ix_trace_rs::trace;
+    use quire_exact::ValueType;
+    use quire_semantic_value::location::{Location, Origin};
+
+    #[trace("FR-004-AC-1", "FR-004-AC-2")]
+    #[test]
+    fn power_read_preserves_order_and_borrowed_metadata() {
+        let operation = NodeKind::QuantityPower(NodeId(9), NodeId(4));
+        let value_type = ValueType::Boolean;
+        let location = Location::root(Origin::Expression);
+        let mut visited = alloc::vec::Vec::new();
+        let read = NodeRead::from_stored(&operation, &value_type, &location, |id| {
+            visited.push(id.index());
+            id.index() + 20
+        });
+        assert!(matches!(read.operation, NodeKind::QuantityPower(29, 24)));
+        assert_eq!(visited, [9, 4]);
+        assert!(core::ptr::eq(read.value_type, &value_type));
+        assert!(core::ptr::eq(read.location, &location));
+        assert_ne!(operation, NodeKind::QuantityPower(NodeId(4), NodeId(9)));
     }
 }
