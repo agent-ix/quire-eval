@@ -94,6 +94,8 @@ pub struct Evaluation {
 /// The locus named by an admission failure for a checked package call.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CallAdmissionLocus {
+    /// The checked package as a whole, without a node or member payload.
+    Package,
     /// The selected checked node.
     Node(NodeKey),
     /// The population node whose input admission observed the defect.
@@ -143,7 +145,7 @@ pub enum CallFailure {
     #[error(transparent)]
     Input(#[from] InputRefusal),
     /// A checked-package-specific selection or supply was refused or left
-    /// incomplete before S6a. Its population/node/member/binder locus
+    /// incomplete before S6a. Its package/node/population/member/binder locus
     /// are preserved separately from function-argument [`Self::Input`] and
     /// checked-body [`Self::Body`] failures. The original QSV input-path
     /// diagnostic is retained with its checked-package locus.
@@ -289,6 +291,58 @@ mod tests {
                 PathStep::Index(2),
             ],
             kernel: Some(ConstructionCause::TypeMismatch),
+        }
+    }
+
+    /// Trace: FR-005-AC-1, FR-005-AC-2.
+    #[test]
+    fn package_admission_retains_locus_and_diagnostic() {
+        let diagnostic = diagnostic();
+        let failure = CallFailure::Admission(Box::new(CallAdmissionFailure::Refused(
+            CallAdmissionRecord {
+                record: diagnostic.clone(),
+                locus: CallAdmissionLocus::Package,
+            },
+        )));
+
+        assert_eq!(failure.category(), Category::Refusal);
+        let CallFailure::Admission(payload) = failure else {
+            panic!("expected an admission failure");
+        };
+        let CallAdmissionFailure::Refused(record) = *payload else {
+            panic!("expected an admission refusal");
+        };
+        assert_eq!(record.locus, CallAdmissionLocus::Package);
+        assert_eq!(record.record, diagnostic);
+    }
+
+    /// Trace: FR-005-AC-1, FR-005-AC-2.
+    #[test]
+    fn existing_call_admission_loci_keep_their_payloads() {
+        let key = NodeKey::new("test", vec![PathSegment::Text(String::from("node"))], 1)
+            .expect("valid test key");
+        let loci = [
+            CallAdmissionLocus::Node(key.clone()),
+            CallAdmissionLocus::Population(key.clone()),
+            CallAdmissionLocus::Member {
+                name: String::from("captures"),
+                index: Some(2),
+            },
+            CallAdmissionLocus::Binder(key.clone()),
+        ];
+
+        assert_eq!(loci[0], CallAdmissionLocus::Node(key.clone()));
+        assert_eq!(loci[1], CallAdmissionLocus::Population(key.clone()));
+        assert_eq!(
+            loci[2],
+            CallAdmissionLocus::Member {
+                name: String::from("captures"),
+                index: Some(2),
+            }
+        );
+        assert_eq!(loci[3], CallAdmissionLocus::Binder(key));
+        for locus in loci {
+            assert_ne!(locus, CallAdmissionLocus::Package);
         }
     }
 
