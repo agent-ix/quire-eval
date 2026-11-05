@@ -3,7 +3,7 @@ id: FR-005
 title: Name package-level checked-call admission failures
 type: FR
 relationships:
-  - target: ix://agent-ix/quire-specification/FR-390
+  - target: ix://agent-ix/quire-spec-language/FR-390
     type: implements
 ---
 # FR-005: Name package-level checked-call admission failures
