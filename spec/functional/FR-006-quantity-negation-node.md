@@ -32,8 +32,8 @@ operation.
 
 | ID | Criteria | Verification |
 | --- | --- | --- |
-| FR-006-AC-1 | A quantity-negation read retains a distinct unary `QuantityNegate` operation and maps its one operand exactly once, including when its source handle differs from the read node handle. | Test |
-| FR-006-AC-2 | The read borrows the supplied checked result type and location without reconstructing either metadata value; the node adds no unit, law, mode, member or magnitude field. | Test, Inspection |
+| FR-006-AC-1 | A quantity-negation read retains a distinct unary `QuantityNegate` operation and maps its one operand exactly once, including when the mapped child handle differs from the stored operand handle. | Test |
+| FR-006-AC-2 | The read borrows the supplied checked result type and location without reconstructing either metadata value; the node adds no unit, law, mode, member or magnitude field. | Test |
 
 ## Dependencies
 
