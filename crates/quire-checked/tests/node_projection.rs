@@ -93,6 +93,7 @@ fn every_operation_projects_all_children_and_retains_metadata() {
             vec![1, 2],
         ),
         (NodeKind::Negate(1), vec![1]),
+        (NodeKind::QuantityNegate(1), vec![1]),
         (NodeKind::QuantityPower(1, 2), vec![1, 2]),
         (
             NodeKind::Divide {
