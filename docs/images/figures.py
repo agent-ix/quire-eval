@@ -105,7 +105,7 @@ def ecosystem(here="quire-spec-language"):
         "quire-contract-ir feeds quire-analyze. quire-observation feeds quire-protocol and "
         "quire-mltl. Above the chain, quire-driver runs it, "
         "quire-integration tests it and quire-verification plans verification. Below it, shared "
-        "libraries used throughout: quire-exact, quire-semantic-value, quire-walk, "
+        "libraries used throughout: quire-eval, quire-exact, quire-semantic-value, quire-walk, "
         "quire-canonical and quire-verification-contracts.",
     )
     w, h, step = 176, 50, 201
