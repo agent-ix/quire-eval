@@ -136,3 +136,12 @@ fn prepare_settings_have_their_published_names() {
     );
     assert_eq!(PrepareSetting::CodeBytes.name(), "prepare.code_bytes");
 }
+
+/// Trace: FR-296-AC-4.
+#[test]
+fn the_default_backend_choice_is_the_interpreter() {
+    assert_eq!(
+        ExecutionBackendChoice::default(),
+        ExecutionBackendChoice::Interpreter
+    );
+}

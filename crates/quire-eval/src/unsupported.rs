@@ -17,9 +17,10 @@ const CAUSE_NOT_SUPPLIED: &str = "backend-not-supplied";
 const CAUSE_UNTRANSLATABLE: &str = "untranslatable-entry";
 
 /// The execution backend a request chose (FR-296).
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ExecutionBackendChoice {
     /// The interpreter.
+    #[default]
     Interpreter,
     /// The ahead-of-time compiler.
     Aot,
