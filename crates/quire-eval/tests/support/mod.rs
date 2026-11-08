@@ -30,7 +30,7 @@ use quire_exact::{
 use quire_semantic_value::call::InputRefusal;
 use quire_semantic_value::catalog::InternalFault;
 use quire_semantic_value::declaration::{EnvironmentFailure, StorageRequest, StorageUnit};
-use quire_semantic_value::location::{Location, Origin};
+use quire_semantic_value::location::{ExpressionLocation, ExpressionOwner};
 use quire_semantic_value::loss::{LocatedLoss, ValueLoss};
 
 /// A fixture node key: the toy closure's own structural identities, the
@@ -96,14 +96,14 @@ pub fn int(n: u64) -> Value {
 }
 
 /// The call site of a request that does not depend on depth.
-pub fn site() -> Location {
-    Location::root(Origin::Expression)
+pub fn site() -> ExpressionLocation {
+    ExpressionLocation::root(ExpressionOwner::Expression)
 }
 
 /// The checked body root of an admitted callable in the toy closure.
-pub fn root_site(callable: &NodeKey) -> Location {
+pub fn root_site(callable: &NodeKey) -> ExpressionLocation {
     let index = usize::try_from(callable.ordinal()).expect("toy ordinals fit usize");
-    Location::root(Origin::Body {
+    ExpressionLocation::root(ExpressionOwner::Body {
         function: format!("toy_{index}"),
         index,
     })
@@ -111,9 +111,9 @@ pub fn root_site(callable: &NodeKey) -> Location {
 
 /// The call site of the request that applies `COUNT` to `argument`, so a
 /// denied call identifies how deep the run got.
-pub fn count_site(argument: u64) -> Location {
+pub fn count_site(argument: u64) -> ExpressionLocation {
     let step = usize::try_from(argument).unwrap_or(usize::MAX);
-    Location::at(Origin::Expression, &[step])
+    ExpressionLocation::at(ExpressionOwner::Expression, &[step])
 }
 
 /// The integer a completed evaluation holds.
@@ -249,7 +249,7 @@ impl CheckedClosure for Toy {
         Self::admitted(callable).then(|| signature_of_arity(Self::arity(callable)))
     }
 
-    fn root_call_site(&self, callable: &NodeKey) -> Option<Location> {
+    fn root_call_site(&self, callable: &NodeKey) -> Option<ExpressionLocation> {
         (Self::admitted(callable) && !self.missing_root_site).then(|| root_site(callable))
     }
 

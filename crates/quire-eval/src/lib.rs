@@ -37,10 +37,12 @@ mod cause;
 mod closure;
 pub mod collection;
 mod integer;
+mod prepare_limit;
 mod registry;
 mod result;
 mod session;
 mod signature;
+mod unsupported;
 
 pub use body::{Body, BodyFactory, BodyFailure, ChildRequest, Resume, Transition};
 pub use cause::{
@@ -48,6 +50,7 @@ pub use cause::{
 };
 pub use closure::{CheckedClosure, RequestRefusal};
 pub use integer::modulo;
+pub use prepare_limit::{PrepareLimitReached, PrepareSetting};
 pub use quire_semantic_value::admission::ObservationAdmission;
 pub use registry::{Admission, Registry};
 pub use result::{
@@ -56,3 +59,7 @@ pub use result::{
 };
 pub use session::{Progress, Session};
 pub use signature::Signature;
+pub use unsupported::{
+    ExecutionBackendChoice, UnsupportedCause, UnsupportedEntry, UnsupportedPayload,
+    UntranslatableConstruct,
+};

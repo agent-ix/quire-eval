@@ -16,7 +16,7 @@ use quire_semantic_value::absence::AbsenceMode;
 use quire_semantic_value::declaration::{
     CheckedEquality, EqualityOperand, EqualityOperator, FieldRef,
 };
-use quire_semantic_value::location::Location;
+use quire_semantic_value::location::ExpressionLocation;
 
 use crate::integer_division::AdmittedIntegerDivision;
 use crate::key::DeclarationKey;
@@ -631,8 +631,8 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
 /// ```no_run
 /// use quire_checked::{NodeKind, NodeRead};
 /// use quire_exact::{Value, ValueType};
-/// use quire_semantic_value::location::Location;
-/// fn describe<'a>(value: &'a Value, value_type: &'a ValueType, location: &'a Location)
+/// use quire_semantic_value::location::ExpressionLocation;
+/// fn describe<'a>(value: &'a Value, value_type: &'a ValueType, location: &'a ExpressionLocation)
 ///     -> NodeRead<'a, usize>
 /// {
 ///     NodeRead { operation: NodeKind::Literal(value), value_type, location }
@@ -645,9 +645,9 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
 /// use quire_checked::{NodeKind, NodeRead};
 /// use quire_checked::integer_division::AdmittedIntegerDivision;
 /// use quire_exact::{Value, ValueType};
-/// use quire_semantic_value::location::Location;
+/// use quire_semantic_value::location::ExpressionLocation;
 /// fn admitted_only(_: &AdmittedIntegerDivision) {}
-/// fn attempt(value: &Value, value_type: &ValueType, location: &Location) {
+/// fn attempt(value: &Value, value_type: &ValueType, location: &ExpressionLocation) {
 ///     let read: NodeRead<'_, usize> = NodeRead {
 ///         operation: NodeKind::Literal(value), value_type, location,
 ///     };
@@ -661,7 +661,7 @@ pub struct NodeRead<'a, Child> {
     /// The checked static type.
     pub value_type: &'a ValueType,
     /// The checked source location.
-    pub location: &'a Location,
+    pub location: &'a ExpressionLocation,
 }
 
 impl<'a, Child> NodeRead<'a, Child> {
@@ -672,7 +672,7 @@ impl<'a, Child> NodeRead<'a, Child> {
     pub fn from_stored(
         operation: &'a NodeKind,
         value_type: &'a ValueType,
-        location: &'a Location,
+        location: &'a ExpressionLocation,
         child: impl FnMut(&'a NodeId) -> Child,
     ) -> Self {
         Self {
@@ -1037,7 +1037,7 @@ impl<Child, Literal> NodeKind<Child, Literal> {
 mod tests {
     use super::{Connective, ConnectiveOrigin, NodeId, NodeKind, NodeRead, OrderedKind};
     use quire_exact::{FloatType, IeeeWidth, RoundingMode, ValueType};
-    use quire_semantic_value::location::{Location, Origin};
+    use quire_semantic_value::location::{ExpressionLocation, ExpressionOwner};
 
     /// Trace: FR-001-AC-1, FR-001-AC-6
     #[test]
@@ -1052,7 +1052,7 @@ mod tests {
             IeeeWidth::Binary32,
             RoundingMode::TowardPositive,
         ));
-        let location = Location::root(Origin::Expression);
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
         let read = NodeRead::from_stored(&operation, &value_type, &location, |id| id.index() + 10);
         let NodeKind::IeeeFloat32Fma(rounding, first, second, third) = read.operation else {
             panic!("float32 fma changed operation identity");
@@ -1074,7 +1074,7 @@ mod tests {
             IeeeWidth::Binary64,
             RoundingMode::TowardNegative,
         ));
-        let location = Location::root(Origin::Expression);
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
         let read = NodeRead::from_stored(&operation, &value_type, &location, |id| id.index() + 10);
         let NodeKind::IeeeFloat64Fma(rounding, first, second, third) = read.operation else {
             panic!("float64 fma changed operation identity");
@@ -1088,7 +1088,7 @@ mod tests {
     fn total_order_read_retains_float_domain_without_ordinary_order() {
         let operation = NodeKind::IeeeTotalOrder(OrderedKind::Float, NodeId(7), NodeId(8));
         let value_type = ValueType::Boolean;
-        let location = Location::root(Origin::Expression);
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
         let read = NodeRead::from_stored(&operation, &value_type, &location, |id| id.index() + 10);
         let NodeKind::IeeeTotalOrder(kind, left, right) = read.operation else {
             panic!("IEEE total order changed operation identity");
@@ -1102,7 +1102,7 @@ mod tests {
     fn bit_identity_read_retains_distinct_identity_and_operand_order() {
         let operation = NodeKind::IeeeBitIdentical(NodeId(9), NodeId(10));
         let value_type = ValueType::Boolean;
-        let location = Location::root(Origin::Expression);
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
         let read = NodeRead::from_stored(&operation, &value_type, &location, |id| id.index() + 10);
         let NodeKind::IeeeBitIdentical(left, right) = read.operation else {
             panic!("IEEE bit identity changed operation identity");
@@ -1114,7 +1114,7 @@ mod tests {
     #[test]
     fn connective_read_retains_operator_and_operand_order() {
         let value_type = ValueType::Boolean;
-        let location = Location::root(Origin::Expression);
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
         for (op, left, right) in [
             (Connective::And, 1, 2),
             (Connective::Or, 3, 4),
@@ -1132,7 +1132,7 @@ mod tests {
         }
     }
 
-    fn read_origin(origin: ConnectiveOrigin, location: &Location) -> ConnectiveOrigin {
+    fn read_origin(origin: ConnectiveOrigin, location: &ExpressionLocation) -> ConnectiveOrigin {
         let operation = NodeKind::Connective(Connective::Or, origin, NodeId(1), NodeId(2));
         let value_type = ValueType::Boolean;
         let read = NodeRead::from_stored(&operation, &value_type, location, |id| id.index() + 10);
@@ -1145,7 +1145,7 @@ mod tests {
     /// Trace: FR-002-AC-3
     #[test]
     fn authored_connective_reads_authored() {
-        let location = Location::root(Origin::Expression);
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
         assert_eq!(
             read_origin(ConnectiveOrigin::Authored, &location),
             ConnectiveOrigin::Authored
@@ -1155,7 +1155,7 @@ mod tests {
     /// Trace: FR-002-AC-4
     #[test]
     fn synthesized_connective_reads_synthesized() {
-        let location = Location::root(Origin::Expression);
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
         assert_eq!(
             read_origin(ConnectiveOrigin::Synthesized, &location),
             ConnectiveOrigin::Synthesized
@@ -1165,9 +1165,9 @@ mod tests {
     /// Trace: FR-002-AC-5
     #[test]
     fn connective_origin_does_not_depend_on_read_location() {
-        let root = Location::root(Origin::Expression);
+        let root = ExpressionLocation::root(ExpressionOwner::Expression);
         let child = root.child(0);
-        let other = Location::at(Origin::Expression, &[3, 1]);
+        let other = ExpressionLocation::at(ExpressionOwner::Expression, &[3, 1]);
         for origin in [ConnectiveOrigin::Authored, ConnectiveOrigin::Synthesized] {
             for location in [&root, &child, &other] {
                 assert_eq!(read_origin(origin, location), origin);
@@ -1200,12 +1200,12 @@ mod collection_retirement_tests {
     use super::{NodeId, NodeKind, NodeRead};
     use ix_trace_rs::trace;
     use quire_exact::ValueType;
-    use quire_semantic_value::location::{Location, Origin};
+    use quire_semantic_value::location::{ExpressionLocation, ExpressionOwner};
 
     #[trace("FR-003-AC-1")]
     #[test]
     fn removal_reads_preserve_operation_operands_and_metadata() {
-        let location = Location::root(Origin::Expression);
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
         let value_type = ValueType::collection(quire_exact::CollectionType::new(
             quire_exact::CollectionKind::Sequence,
             ValueType::Boolean,
@@ -1235,14 +1235,14 @@ mod quantity_negate_tests {
     use super::{NodeId, NodeKind, NodeRead};
     use ix_trace_rs::trace;
     use quire_exact::ValueType;
-    use quire_semantic_value::location::{Location, Origin};
+    use quire_semantic_value::location::{ExpressionLocation, ExpressionOwner};
 
     #[trace("FR-006-AC-1", "FR-006-AC-2")]
     #[test]
     fn negate_read_maps_only_its_operand_and_borrows_metadata() {
         let operation = NodeKind::QuantityNegate(NodeId(9));
         let value_type = ValueType::Boolean;
-        let location = Location::root(Origin::Expression);
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
         let mut visited = alloc::vec::Vec::new();
         let read = NodeRead::from_stored(&operation, &value_type, &location, |id| {
             visited.push(id.index());
@@ -1261,14 +1261,14 @@ mod quantity_power_tests {
     use super::{NodeId, NodeKind, NodeRead};
     use ix_trace_rs::trace;
     use quire_exact::ValueType;
-    use quire_semantic_value::location::{Location, Origin};
+    use quire_semantic_value::location::{ExpressionLocation, ExpressionOwner};
 
     #[trace("FR-004-AC-1", "FR-004-AC-2")]
     #[test]
     fn power_read_preserves_order_and_borrowed_metadata() {
         let operation = NodeKind::QuantityPower(NodeId(9), NodeId(4));
         let value_type = ValueType::Boolean;
-        let location = Location::root(Origin::Expression);
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
         let mut visited = alloc::vec::Vec::new();
         let read = NodeRead::from_stored(&operation, &value_type, &location, |id| {
             visited.push(id.index());

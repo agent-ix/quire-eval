@@ -418,8 +418,8 @@ fn root_read_path_is_the_plain_descriptor_type() {
     fn accepts_read(_: &NodeRead<'_, usize>) {}
     let value = Value::Boolean(true);
     let value_type = ValueType::Boolean;
-    let location = quire_semantic_value::location::Location::root(
-        quire_semantic_value::location::Origin::Expression,
+    let location = quire_semantic_value::location::ExpressionLocation::root(
+        quire_semantic_value::location::ExpressionOwner::Expression,
     );
     let read = NodeRead {
         operation: NodeKind::Literal(&value),

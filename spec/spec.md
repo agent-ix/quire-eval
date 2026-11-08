@@ -43,7 +43,8 @@ collection removal nodes, projections and value operations are specified in
 admission loci are specified in
 [FR-005](functional/FR-005-package-call-admission-locus.md). The quantity-negation
 descriptor and borrowed read are specified in
-[FR-006](functional/FR-006-quantity-negation-node.md). Other crate behavior
+[FR-006](functional/FR-006-quantity-negation-node.md). The unsupported-entry and prepare-limit call failures are specified in
+[FR-007](functional/FR-007-unsupported-entry-and-prepare-limit-failures.md). Other crate behavior
 remains outside this requirement inventory.
 
 The IEEE arithmetic, comparison, rounding, and diagnostic semantics remain
