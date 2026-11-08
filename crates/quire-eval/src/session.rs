@@ -10,7 +10,7 @@ use core::mem;
 
 use quire_exact::{Charge, ChargePoint, Incomplete, Meter, NodeKey, Outcome, Value};
 use quire_semantic_value::catalog::InternalFault;
-use quire_semantic_value::location::Location;
+use quire_semantic_value::location::ExpressionLocation;
 
 use crate::body::{Body, ChildRequest, Resume, Transition};
 use crate::closure::{CheckedClosure, RequestRefusal};
@@ -23,7 +23,7 @@ pub(crate) enum Entry<C: CheckedClosure> {
     Root {
         callable: NodeKey,
         arguments: Vec<Value>,
-        site: Location,
+        site: ExpressionLocation,
     },
     /// A body's saved request, validated when it is entered.
     Request(ChildRequest),
@@ -218,7 +218,7 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
         &mut self,
         callable: NodeKey,
         arguments: Vec<Value>,
-        site: Option<Location>,
+        site: Option<ExpressionLocation>,
     ) -> Result<Option<Evaluation>, CallFailure> {
         if let Err(denied) = self.meter.charge(Charge::new(ChargePoint::FunctionCall)) {
             return Ok(Some(Self::incomplete(denied, site)));
@@ -245,7 +245,7 @@ impl<'a, C: CheckedClosure> Session<'a, C> {
     /// cancellation handle denied is a denied charge like any other
     /// (FR-262): earlier spend is retained, the denied charge is unrecorded,
     /// and the handle's `tripped()` reports the cause for the caller to read.
-    fn incomplete(denied: Incomplete, site: Option<Location>) -> Evaluation {
+    fn incomplete(denied: Incomplete, site: Option<ExpressionLocation>) -> Evaluation {
         Evaluation {
             outcome: FamilyOutcome::Evaluated(Outcome::Incomplete(denied)),
             location: site,

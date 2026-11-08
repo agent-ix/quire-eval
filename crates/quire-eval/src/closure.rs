@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use quire_exact::{Meter, NodeKey, Value};
 use quire_semantic_value::catalog::InternalFault;
-use quire_semantic_value::location::Location;
+use quire_semantic_value::location::ExpressionLocation;
 
 use crate::body::Transition;
 use crate::result::{CallFailure, Evaluation};
@@ -59,7 +59,7 @@ pub trait CheckedClosure {
     ///
     /// `Begin` treats an absent location after admission as a broken closure
     /// invariant, before sealing the registry or charging the meter.
-    fn root_call_site(&self, callable: &NodeKey) -> Option<Location>;
+    fn root_call_site(&self, callable: &NodeKey) -> Option<ExpressionLocation>;
 
     /// Validate an application of `callable` to `arguments`, before any
     /// charge: the callable is in the closure, the arguments are complete and

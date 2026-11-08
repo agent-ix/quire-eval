@@ -12,13 +12,15 @@ use quire_semantic_value::admission::AdmissionRecord;
 use quire_semantic_value::call::InputRefusal;
 use quire_semantic_value::catalog::{CatalogCoded, Category, InternalFault, UndefinedCoded};
 use quire_semantic_value::declaration::EnvironmentFailure;
-use quire_semantic_value::location::Location;
+use quire_semantic_value::location::ExpressionLocation;
 use quire_semantic_value::loss::LocatedLoss;
 use quire_semantic_value::supplied_stop::{
     SuppliedCause, SuppliedFailure, SuppliedStop, UnsupportedHelperStop,
 };
 
 use crate::body::BodyFailure;
+use crate::prepare_limit::PrepareLimitReached;
+use crate::unsupported::UnsupportedEntry;
 
 /// ADR-013 O-16: a family's own evaluation-time result. `Refused`, category
 /// `refusal`, holds a family-owned refusal cause; `Undefined`, category
@@ -85,7 +87,7 @@ pub struct Evaluation {
     /// The outcome.
     pub outcome: FamilyOutcome<Value>,
     /// Where a non-completed outcome originated; `None` when completed.
-    pub location: Option<Location>,
+    pub location: Option<ExpressionLocation>,
     /// The loss records of the operations a completed evaluation performed,
     /// in evaluation order; empty unless completed.
     pub losses: Vec<LocatedLoss>,
@@ -190,6 +192,16 @@ pub enum CallFailure {
     /// other arm.
     #[error("supplied-value {phase} reached the unqualified {family:?} helper", phase = .0.context.phase.as_str(), family = .0.family)]
     UnsupportedHelper(Box<UnsupportedHelperStop>),
+    /// An entry the chosen execution backend cannot run (FR-294, FR-296).
+    /// Category unsupported, catalog code `unimplemented_capability`. No
+    /// evaluator in this crate returns it.
+    #[error(transparent)]
+    Unsupported(#[from] UnsupportedEntry),
+    /// A `PrepareLimits` bound that `prepare` reached (FR-279, FR-294).
+    /// Category incomplete, catalog code `stage_limit_exceeded`. No evaluator
+    /// in this crate returns it.
+    #[error(transparent)]
+    Limit(#[from] PrepareLimitReached),
 }
 
 impl From<InternalFault> for CallFailure {
@@ -250,7 +262,8 @@ impl CallFailure {
                 | SuppliedCause::Storage(_)
                 | SuppliedCause::Capacity(_) => Category::Incomplete,
             },
-            Self::UnsupportedHelper(_) => Category::Unsupported,
+            Self::UnsupportedHelper(_) | Self::Unsupported(_) => Category::Unsupported,
+            Self::Limit(_) => Category::Incomplete,
         }
     }
 }

@@ -4,7 +4,7 @@
 use quire_checked::node::{CaseArm, CheckedLiteral, RecordSlot};
 use quire_checked::{NodeKind, NodeRead};
 use quire_exact::{Value, ValueType};
-use quire_semantic_value::location::{Location, Origin};
+use quire_semantic_value::location::{ExpressionLocation, ExpressionOwner};
 
 /// Trace: FR-400-AC-11
 #[test]
@@ -100,7 +100,7 @@ fn nested_children_and_operand_order_survive_projection() {
 #[test]
 fn borrowed_literal_and_checked_metadata_have_one_read_shape() {
     let value_type = ValueType::Boolean;
-    let location = Location::root(Origin::Expression);
+    let location = ExpressionLocation::root(ExpressionOwner::Expression);
     let stored = NodeKind::Literal(CheckedLiteral(Value::Boolean(true)));
     let read = NodeRead::<usize>::from_stored(&stored, &value_type, &location, |_| unreachable!());
     let NodeKind::Literal(literal) = read.operation else {

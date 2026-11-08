@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use quire_exact::{Cancel, CancelCause, Meter, NodeKey, Value};
 use quire_semantic_value::catalog::InternalFault;
 use quire_semantic_value::declaration::{EnvironmentFailure, EnvironmentLimitKind};
-use quire_semantic_value::location::Location;
+use quire_semantic_value::location::ExpressionLocation;
 
 use crate::result::Evaluation;
 
@@ -76,7 +76,7 @@ pub struct ChildRequest {
     /// The completed arguments, in declared parameter order.
     pub arguments: Vec<Value>,
     /// The call site, where a denied charge for this application is located.
-    pub site: Location,
+    pub site: ExpressionLocation,
 }
 
 /// What a body is resumed with.
