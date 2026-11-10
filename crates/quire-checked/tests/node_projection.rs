@@ -193,6 +193,14 @@ fn every_operation_projects_all_children_and_retains_metadata() {
         ),
         (NodeKind::Present(1), vec![1]),
         (
+            NodeKind::PlaceReference {
+                reference: 1,
+                place: key.clone(),
+                slots: vec![2, 3],
+            },
+            vec![1, 2, 3],
+        ),
+        (
             NodeKind::PlacePresence {
                 reference: 1,
                 field: field.clone(),
@@ -382,7 +390,7 @@ fn every_operation_projects_all_children_and_retains_metadata() {
         ),
     ];
 
-    assert_eq!(cases.len(), 65, "a canonical variant was omitted");
+    assert_eq!(cases.len(), 66, "a canonical variant was omitted");
     for (stored, expected_children) in cases {
         let mut seen = Vec::new();
         let mut literal_reads = 0;

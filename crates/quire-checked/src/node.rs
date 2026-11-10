@@ -408,6 +408,16 @@ pub enum NodeKind<Child = NodeId, Literal = CheckedLiteral> {
     },
     /// Test optional presence.
     Present(Child),
+    /// Refer to a checker-selected clock place without reading its clock value.
+    /// This descriptor grants no admission or evaluation authority.
+    PlaceReference {
+        /// The owner-object reference operand.
+        reference: Child,
+        /// The producer-assigned key of the clock-place template.
+        place: NodeKey,
+        /// Integer selectors in the template's slot-step order.
+        slots: Vec<Child>,
+    },
     /// Test presence of a guarded clock place.
     PlacePresence {
         /// The reference operand.
@@ -820,6 +830,15 @@ impl<Child, Literal> NodeKind<Child, Literal> {
                 unique: *unique,
             },
             K::Present(value) => K::Present(child(value)),
+            K::PlaceReference {
+                reference,
+                place,
+                slots,
+            } => K::PlaceReference {
+                reference: child(reference),
+                place: place.clone(),
+                slots: slots.iter().map(&mut child).collect(),
+            },
             K::PlacePresence {
                 reference,
                 field,
@@ -1279,5 +1298,111 @@ mod quantity_power_tests {
         assert!(core::ptr::eq(read.value_type, &value_type));
         assert!(core::ptr::eq(read.location, &location));
         assert_ne!(operation, NodeKind::QuantityPower(NodeId(4), NodeId(9)));
+    }
+}
+
+#[cfg(test)]
+mod place_reference_tests {
+    use super::{NodeId, NodeKind, NodeRead};
+    use alloc::vec;
+    use alloc::vec::Vec;
+    use ix_trace_rs::trace;
+    use quire_exact::{EffectiveId, NodeKey, OriginalDeclarationKey, PathSegment, ValueType};
+    use quire_semantic_value::location::{ExpressionLocation, ExpressionOwner};
+
+    fn template() -> NodeKey {
+        NodeKey::new("fixture", vec![PathSegment::Text("clock_place".into())], 3)
+            .expect("structural template key")
+    }
+
+    #[trace("FR-008-AC-1", "FR-008-AC-4")]
+    #[test]
+    fn scalar_place_reference_preserves_template_and_borrows_checked_metadata() {
+        let place = template();
+        let stored = NodeKind::PlaceReference {
+            reference: NodeId(9),
+            place: place.clone(),
+            slots: vec![],
+        };
+        let value_type = ValueType::Reference(EffectiveId::new(
+            None,
+            OriginalDeclarationKey::new("fixture", "clock"),
+        ));
+        let location = ExpressionLocation::root(ExpressionOwner::Expression).child(2);
+        let mut seen = Vec::new();
+        let read = NodeRead::from_stored(&stored, &value_type, &location, |id| {
+            seen.push(id.index());
+            id.index() + 20
+        });
+        let NodeKind::PlaceReference {
+            reference,
+            place: projected,
+            slots,
+        } = read.operation
+        else {
+            panic!("clock reference changed operation");
+        };
+        assert_eq!(seen, [9]);
+        assert_eq!(reference, 29);
+        assert_eq!(projected, place);
+        assert!(slots.is_empty());
+        assert!(core::ptr::eq(read.value_type, &value_type));
+        assert!(core::ptr::eq(read.location, &location));
+    }
+
+    #[trace("FR-008-AC-2")]
+    #[test]
+    fn place_reference_maps_owner_then_slots_in_path_order() {
+        let stored = NodeKind::PlaceReference {
+            reference: NodeId(9),
+            place: template(),
+            slots: vec![NodeId(7), NodeId(2)],
+        };
+        let value_type = ValueType::Boolean;
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
+        let mut seen = Vec::new();
+        let read = NodeRead::from_stored(&stored, &value_type, &location, |id| {
+            seen.push(id.index());
+            seen.len()
+        });
+        let NodeKind::PlaceReference {
+            reference, slots, ..
+        } = read.operation
+        else {
+            panic!("clock reference changed operation");
+        };
+        assert_eq!(seen, [9, 7, 2]);
+        assert_eq!(reference, 1);
+        assert_eq!(slots, [2, 3]);
+    }
+
+    #[trace("FR-008-AC-3")]
+    #[test]
+    fn place_reference_maps_every_repeated_selector_occurrence() {
+        let place = template();
+        let stored = NodeKind::PlaceReference {
+            reference: NodeId(8),
+            place: place.clone(),
+            slots: vec![NodeId(3), NodeId(3)],
+        };
+        let value_type = ValueType::Boolean;
+        let location = ExpressionLocation::root(ExpressionOwner::Expression);
+        let mut seen = Vec::new();
+        let read = NodeRead::from_stored(&stored, &value_type, &location, |id| {
+            seen.push(id.index());
+            id.index() + 20
+        });
+        let NodeKind::PlaceReference {
+            reference,
+            place: projected,
+            slots,
+        } = read.operation
+        else {
+            panic!("clock reference changed operation");
+        };
+        assert_eq!(seen, [8, 3, 3]);
+        assert_eq!(reference, 28);
+        assert_eq!(slots, [23, 23]);
+        assert_eq!(projected, place);
     }
 }
